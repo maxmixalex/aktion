@@ -1,0 +1,49 @@
+name: Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Emergency hosted build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.3'
+          cache: true
+
+      - name: Resolve modules
+        run: go mod tidy
+
+      - name: Test
+        run: go test ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+
+      - name: Build recovery binaries
+        shell: bash
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/aktion-windows-amd64.exe ./cmd/aktion
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/aktion-linux-amd64 ./cmd/aktion
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/aktion-listener-linux-amd64 ./cmd/aktion-listener
+
+      - name: Upload recovery binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: aktion-bootstrap
+          path: dist/*
