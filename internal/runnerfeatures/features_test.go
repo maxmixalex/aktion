@@ -33,6 +33,31 @@ func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
 	}
 }
 
+func TestBuiltinSVNFeature(t *testing.T) {
+	catalog, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	svn, ok := catalog["svn"]
+	if !ok {
+		t.Fatalf("svn builtin missing from catalog: %#v", catalog)
+	}
+	if svn.Manifest.Name != "Subversion client" {
+		t.Fatalf("svn name=%q", svn.Manifest.Name)
+	}
+	install := string(svn.Install)
+	if !strings.Contains(install, "apt-get install -y --no-install-recommends subversion") {
+		t.Fatalf("svn install script=%q", install)
+	}
+	pkg, err := loadBuiltin("builtin:svn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pkg.Manifest.ID != "svn" || len(pkg.Files) != 1 || pkg.Files[0].Path != "install.sh" {
+		t.Fatalf("svn package=%#v", pkg)
+	}
+}
+
 func TestSelectionsDecodeDevContainerStyleValues(t *testing.T) {
 	var selections Selections
 	data := "{\n" +

@@ -194,6 +194,7 @@ builtin:glib
 builtin:gtk4
 builtin:ncurses
 builtin:lua54
+builtin:svn
 ```
 
 原来的：

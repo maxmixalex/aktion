@@ -208,6 +208,7 @@ Aktion keeps a small builtin catalog only where the official Dev Container colle
 - `builtin:gtk4`
 - `builtin:ncurses`
 - `builtin:lua54`
+- `builtin:svn`
 
 The former builtin `network`, `archives`, and `python` Features were removed. The default environment now uses official `common-utils`, `python`, and `git-lfs` OCI Features instead.
 

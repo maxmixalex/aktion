@@ -22,6 +22,7 @@ var builtinIDs = map[string]bool{
 	"gtk4":    true,
 	"ncurses": true,
 	"lua54":   true,
+	"svn":     true,
 }
 
 //go:embed features/*/feature.json features/*/install.sh
