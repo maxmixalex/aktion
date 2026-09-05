@@ -70,4 +70,4 @@ aktion config resolve <repo-id>
 aktion logs <repo-id>
 ```
 
-如果报错仍显示连接 `localhost`，通常说明 proxy URL 没有改成 host 可达地址。更多症状见[故障排查](../troubleshooting.md#无法通过-proxy-访问-github-或-registry)。
+如果报错仍显示连接 `localhost`，通常说明 proxy URL 没有改成 host 可达地址。更多症状见[故障排查](../troubleshooting.md)。
