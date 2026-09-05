@@ -109,14 +109,16 @@ func (u *UI) link(label, target string) string {
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
 		return label
 	}
-	if strings.ContainsAny(target, "a
-") {
+	// Prevent control-sequence injection even though current targets are generated internally.
+	if strings.ContainsAny(target, "\x1b\a\r\n") {
 		return label
 	}
-	return "]8;;" + target + "\" + label + "]8;;\"
+	return "\x1b]8;;" + target + "\x1b\\" + label + "\x1b]8;;\x1b\\"
 }
 
-func visibleWidth(s string) int { return lipgloss.Width(s) }
+func visibleWidth(s string) int {
+	return lipgloss.Width(s)
+}
 
 func (u *UI) downsample(s string) string {
 	if u == nil || s == "" {
@@ -156,12 +158,13 @@ func (u *UI) banner(title, subtitle string) {
 	fmt.Println(u.renderStyle("border", strings.Repeat("─", max(32, visibleWidth(title)+visibleWidth(subtitle)+2))))
 }
 
-func (u *UI) section(title string) { fmt.Println(u.renderStyle("accent", "◆ "+title)) }
+func (u *UI) section(title string) {
+	fmt.Println(u.renderStyle("accent", "◆ "+title))
+}
 
 func (u *UI) errorLine(w io.Writer, prefix, message string) {
 	if u == nil {
-		fmt.Fprintf(w, "%s%s
-", prefix, message)
+		fmt.Fprintf(w, "%s%s\n", prefix, message)
 		return
 	}
 	style := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Red)
@@ -183,8 +186,7 @@ func (u *UI) panel(title, body, tone string) string {
 	heading := u.renderStyle("accent", title)
 	content := heading
 	if body != "" {
-		content += "
-" + body
+		content += "\n" + body
 	}
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -200,11 +202,9 @@ func (u *UI) metrics(cards ...metricCard) string {
 		if c.Tone != "" {
 			value = u.badge(c.Tone, c.Value)
 		}
-		body := u.renderStyle("muted", c.Label) + "
-" + value
+		body := u.renderStyle("muted", c.Label) + "\n" + value
 		if c.Hint != "" {
-			body += "
-" + u.renderStyle("muted", c.Hint)
+			body += "\n" + u.renderStyle("muted", c.Hint)
 		}
 		style := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -238,10 +238,14 @@ func (u *UI) table(headers []string, rows [][]tableCell) string {
 		return ""
 	}
 	widths := make([]int, len(headers))
-	for i, h := range headers { widths[i] = visibleWidth(h) }
+	for i, h := range headers {
+		widths[i] = visibleWidth(h)
+	}
 	for _, row := range rows {
 		for i := 0; i < len(row) && i < len(widths); i++ {
-			if w := visibleWidth(row[i].Text); w > widths[i] { widths[i] = w }
+			if w := visibleWidth(row[i].Text); w > widths[i] {
+				widths[i] = w
+			}
 		}
 	}
 
@@ -250,7 +254,9 @@ func (u *UI) table(headers []string, rows [][]tableCell) string {
 		b.WriteString(left)
 		for i, w := range widths {
 			b.WriteString(strings.Repeat(fill, w+2))
-			if i < len(widths)-1 { b.WriteString(mid) }
+			if i < len(widths)-1 {
+				b.WriteString(mid)
+			}
 		}
 		b.WriteString(right)
 		return u.renderStyle("border", b.String())
@@ -260,18 +266,23 @@ func (u *UI) table(headers []string, rows [][]tableCell) string {
 		var b strings.Builder
 		b.WriteString(u.renderStyle("border", "│"))
 		for i := range headers {
-			text, kind := "", ""
+			text := ""
+			kind := ""
 			if header {
-				text, kind = headers[i], "header"
+				text = headers[i]
+				kind = "header"
 			} else if i < len(cells) {
-				text, kind = cells[i].Text, cells[i].Style
+				text = cells[i].Text
+				kind = cells[i].Style
 			}
 			pad := widths[i] - visibleWidth(text)
 			if header {
 				b.WriteString(" " + u.renderStyle(kind, text) + strings.Repeat(" ", pad) + " ")
 			} else {
 				styled := u.renderStyle(kind, text)
-				if i < len(cells) && cells[i].URL != "" { styled = u.link(styled, cells[i].URL) }
+				if i < len(cells) && cells[i].URL != "" {
+					styled = u.link(styled, cells[i].URL)
+				}
 				b.WriteString(" " + styled + strings.Repeat(" ", pad) + " ")
 			}
 			b.WriteString(u.renderStyle("border", "│"))
@@ -281,32 +292,38 @@ func (u *UI) table(headers []string, rows [][]tableCell) string {
 
 	var b strings.Builder
 	b.WriteString(border("╭", "┬", "╮", "─"))
-	b.WriteByte('
-')
+	b.WriteByte('\n')
 	b.WriteString(renderRow(nil, true))
-	b.WriteByte('
-')
+	b.WriteByte('\n')
 	b.WriteString(border("├", "┼", "┤", "─"))
 	for _, row := range rows {
-		b.WriteByte('
-')
+		b.WriteByte('\n')
 		b.WriteString(renderRow(row, false))
 	}
-	b.WriteByte('
-')
+	b.WriteByte('\n')
 	b.WriteString(border("╰", "┴", "╯", "─"))
 	return b.String()
 }
 
 func (u *UI) progressBar(percent float64, width int, tone string) string {
-	if width < 4 { width = 4 }
-	if percent < 0 { percent = 0 }
-	if percent > 100 { percent = 100 }
+	if width < 4 {
+		width = 4
+	}
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
 	filled := int((percent/100.0)*float64(width) + 0.5)
-	if filled > width { filled = width }
+	if filled > width {
+		filled = width
+	}
 	empty := width - filled
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", empty)
-	if tone == "" { tone = "info" }
+	if tone == "" {
+		tone = "info"
+	}
 	return u.renderStyle(tone, bar)
 }
 
