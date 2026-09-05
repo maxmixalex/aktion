@@ -1,0 +1,34 @@
+{
+  "app": {
+    "clientId": "Iv23liXXXXXXXXXXXXXXXXXX",
+    "installationId": 12345678,
+    "privateKeyFile": "./secrets/github-app.pem"
+  },
+  "defaults": {
+    "scaleSetName": "home-docker",
+    "minRunners": 0,
+    "maxRunners": 1,
+    "logLevel": "info",
+    "labels": "",
+    "runnerImage": ""
+  },
+  "repositories": [
+    {
+      "id": "repo-a",
+      "url": "https://github.com/YOUR_NAME/YOUR_PRIVATE_REPO_A",
+      "enabled": true
+    },
+    {
+      "id": "repo-b",
+      "url": "https://github.com/YOUR_NAME/YOUR_PRIVATE_REPO_B",
+      "enabled": false,
+      "minRunners": 1,
+      "maxRunners": 2
+    }
+  ],
+  "proxy": {
+    "http": "",
+    "https": "",
+    "noProxy": "localhost,127.0.0.1"
+  }
+}
