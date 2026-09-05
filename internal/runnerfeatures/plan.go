@@ -327,7 +327,20 @@ func buildDockerfile(baseImage string, features []ResolvedFeature, runtime Runti
 		fmt.Fprintf(&b, "\nFROM %s AS %s\n", previous, stage)
 		b.WriteString("USER root\n")
 		fmt.Fprintf(&b, "COPY features/%s/ /tmp/aktion-feature/\n", contextDir)
-		b.WriteString("RUN chmod +x /tmp/aktion-feature/install.sh \\\n")
+		executableFiles := []string{"install.sh"}
+		for _, file := range feature.Files {
+			if file.Path != "install.sh" && file.Mode.Perm()&0111 != 0 {
+				executableFiles = append(executableFiles, file.Path)
+			}
+		}
+		sort.Strings(executableFiles)
+		b.WriteString("RUN ")
+		for i, file := range executableFiles {
+			if i > 0 {
+				b.WriteString("    && ")
+			}
+			fmt.Fprintf(&b, "chmod +x %s \\\n", shellQuote("/tmp/aktion-feature/"+file))
+		}
 		b.WriteString("    && cd /tmp/aktion-feature \\\n")
 		b.WriteString("    && ")
 		for _, assignment := range featureInstallEnv(feature.Options) {
