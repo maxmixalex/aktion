@@ -16,6 +16,7 @@ Aktion 是一个面向 Docker host 的轻量 GitHub Runner Scale Set manager：�
 - stale scale set 自动复用/reconcile 与显式 `cleanup`
 - HTTP/HTTPS proxy 透传到 listener 和 runner
 - 直接消费 OCI Dev Container Features 构建 runner 环境
+- 仓库级 `.github/aktion.yml`，显式继承版本化 OCI preset
 - 不需要 Kubernetes / ARC cluster
 
 Aktion 底层使用 GitHub 官方 [`actions/scaleset`](https://github.com/actions/scaleset) 实现 Scale Set 协议。
@@ -46,6 +47,31 @@ aktion doctor
 aktion up
 aktion status
 ```
+
+## 项目级 `.github/aktion.yml`
+
+仓库可以把 runner 环境需求随代码一起版本化。例如：
+
+```yaml
+version: 1
+
+extends:
+  - ghcr.io/zyf722/aktion/recommended:1
+
+runner:
+  features:
+    builtin:glib: {}
+    builtin:gtk4: {}
+    builtin:ncurses: {}
+    builtin:lua54: {}
+```
+
+只要项目文件存在，它就从**空环境**开始，base 完全由 `extends` 明确决定，
+不会偷偷继承 Aktion 的旧默认 Feature 集合。本机 `config.json` 中
+`repositories[]` 的显式设置仍作为管理员最终覆盖。
+
+详细 schema、merge 顺序和 OCI artifact 格式见
+[`docs/project-config.zh-CN.md`](docs/project-config.zh-CN.md)。
 
 ## Runner Features
 
@@ -160,6 +186,7 @@ aktion runners
 aktion stats
 aktion doctor
 aktion features
+aktion config resolve <repo-id>
 aktion logs [repo-id]
 aktion scalesets
 aktion cleanup
@@ -188,3 +215,14 @@ runs-on: home-docker
 ```
 
 也就是 **Aktion builds Aktion**。同时保留仅手动触发的 `Bootstrap` workflow 使用 `ubuntu-latest`，用于 self-hosted control plane 自己坏掉时恢复。
+
+
+## GitHub App 权限
+
+仓库级 scale set 需要把 GitHub App 安装到对应仓库，并授予：
+
+- **Repository administration: Read and write**
+- **Contents: Read**（用于读取 default branch 上的 `.github/aktion.yml`）
+- Metadata: Read（隐含）
+
+无需 webhook。

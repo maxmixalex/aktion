@@ -16,6 +16,7 @@ Aktion is a lightweight GitHub Runner Scale Set manager for Docker hosts. It kee
 - stale scale-set reconciliation and cleanup
 - optional HTTP/HTTPS proxy forwarding into listener and job containers
 - OCI Dev Container Features for runner environments
+- repository-owned `.github/aktion.yml` with explicit OCI preset inheritance
 - no Kubernetes / ARC cluster required
 
 Aktion uses GitHub's standalone [`actions/scaleset`](https://github.com/actions/scaleset) client for the Runner Scale Set protocol.
@@ -90,6 +91,25 @@ Copy `config.example.json` to `config.json`, place the GitHub App PEM under `sec
 ```
 
 Repository values override `defaults`; omitted values inherit them.
+
+Projects may also own their runner environment in `.github/aktion.yml`. A project
+config has an explicit empty base and can extend versioned OCI presets:
+
+```yaml
+version: 1
+extends:
+  - ghcr.io/zyf722/aktion/recommended:1
+
+runner:
+  features:
+    builtin:glib: {}
+    builtin:gtk4: {}
+```
+
+When a project config exists, its `extends` chain defines the base rather than
+silently inheriting Aktion's legacy default Feature set. Host-local
+`repositories[]` values remain final administrator overrides. See
+[`docs/project-config.md`](docs/project-config.md).
 
 ## Runner Features
 
@@ -167,6 +187,7 @@ aktion runners
 aktion stats
 aktion doctor
 aktion features
+aktion config resolve <repo-id>
 aktion logs [repo-id]
 aktion scalesets
 aktion cleanup
@@ -182,6 +203,7 @@ aktion restart
 For repository-scoped scale sets, install the App on each configured repository and grant:
 
 - **Repository administration: Read and write**
+- **Contents: Read** (for `.github/aktion.yml`)
 - Metadata read access (implicit)
 
 No webhook is required.

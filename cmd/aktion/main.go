@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zyf722/aktion/internal/aktionconfig"
 	"github.com/zyf722/aktion/internal/runnerfeatures"
 )
 
@@ -79,17 +80,19 @@ type Repository struct {
 
 type RepoResolved struct {
 	Repository
-	ServiceID      string
-	Installation   int64
-	ScaleSet       string
-	Min            int
-	Max            int
-	Log            string
-	LabelsResolved string
-	Image          string
-	BaseImage         string
-	Features          []string
-	FeatureSelections runnerfeatures.Selections
+	ServiceID          string
+	Installation       int64
+	ScaleSet           string
+	Min                int
+	Max                int
+	Log                string
+	LabelsResolved     string
+	Image              string
+	BaseImage          string
+	Features           []string
+	FeatureSelections  runnerfeatures.Selections
+	ProjectConfig      bool
+	ResolvedPresets    []string
 }
 
 type Loaded struct {
@@ -215,6 +218,16 @@ func run(args []string) int {
 		return fail(err)
 	}
 
+	// Commands which inspect or construct runner environments resolve the optional
+	// repository-owned .github/aktion.yml. Pure stop/log operations remain usable
+	// without GitHub connectivity.
+	if cmd != "down" && cmd != "logs" && cmd != "doctor" {
+		loaded, err = resolveProjectConfigs(loaded)
+		if err != nil {
+			return fail(err)
+		}
+	}
+
 	switch cmd {
 	case "render":
 		p, err := renderCompose(loaded)
@@ -224,6 +237,15 @@ func run(args []string) int {
 		fmt.Println("Generated:", p)
 		return 0
 	case "config":
+		if len(rest) > 0 && strings.EqualFold(rest[0], "resolve") {
+			if len(rest) != 2 {
+				return fail(errors.New("usage: aktion config resolve <repo-id>"))
+			}
+			return cmdConfigResolve(loaded, rest[1])
+		}
+		if len(rest) > 0 {
+			return fail(fmt.Errorf("unknown config subcommand %q", rest[0]))
+		}
 		p, err := renderCompose(loaded)
 		if err != nil {
 			return fail(err)
@@ -340,6 +362,7 @@ Commands:
   init              Create config.json from config.example.json
   features          List Aktion builtins and default OCI Features
   config            Render and validate Compose configuration
+  config resolve ID Resolve the effective runner config for one repository
   render            Generate compose.generated.yaml
   up                Build/start all enabled listeners
   down              Stop/remove listener stack
@@ -369,6 +392,7 @@ Links:
 Examples:
   aktion init
   aktion doctor
+  aktion config resolve repo-a
   aktion up
   aktion status
   aktion scalesets
@@ -523,6 +547,173 @@ func loadConfig(root, configName string) (Loaded, error) {
 	}
 	sort.Slice(repos, func(i, j int) bool { return repos[i].ServiceID < repos[j].ServiceID })
 	return Loaded{Root: root, ConfigPath: p, KeyPath: keyPath, Config: cfg, Repos: repos}, nil
+}
+
+
+type githubContentsFile struct {
+	Type     string `json:"type"`
+	Encoding string `json:"encoding"`
+	Content  string `json:"content"`
+}
+
+func resolveProjectConfigs(l Loaded) (Loaded, error) {
+	key, err := loadRSAKey(l.KeyPath)
+	if err != nil {
+		return Loaded{}, err
+	}
+	appJWT, err := signAppJWT(l.Config.App.ClientID, key)
+	if err != nil {
+		return Loaded{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	tokens := map[int64]string{}
+	presetResolver := &aktionconfig.Resolver{
+		Presets: aktionconfig.NewOCIPresetSource(runnerfeatures.DefaultCacheDir()),
+	}
+	for i := range l.Repos {
+		r := &l.Repos[i]
+		token := tokens[r.Installation]
+		if token == "" {
+			token, err = installationAccessToken(ctx, r.Installation, appJWT)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("repository %q installation token: %w", r.ID, err)
+			}
+			tokens[r.Installation] = token
+		}
+		data, found, err := fetchRepositoryAktionConfig(ctx, *r, token)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
+		}
+		if !found {
+			continue
+		}
+		doc, err := aktionconfig.Parse(data)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
+		}
+		resolved, err := presetResolver.Resolve(ctx, doc)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
+		}
+
+		// A repository-owned config has an explicit empty base. Only its extends
+		// chain and runner block form the project environment. Host-local repo
+		// settings are applied last as administrator overrides.
+		features := resolved.Features
+		if r.RunnerFeatures != nil {
+			features, err = aktionconfig.MergeSelections(features, r.RunnerFeatures)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("repository %q local runnerFeatures override: %w", r.ID, err)
+			}
+		}
+		baseImage := resolved.Image
+		if baseImage == "" {
+			baseImage = l.Config.Defaults.RunnerImage
+		}
+		if r.RunnerImage != "" {
+			baseImage = r.RunnerImage
+		}
+		imageName, normalizedBase, err := runnerfeatures.ImageName(baseImage, features)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("repository %q resolved runner config: %w", r.ID, err)
+		}
+		r.Image = imageName
+		r.BaseImage = normalizedBase
+		r.Features = runnerfeatures.SelectionKeys(features)
+		r.FeatureSelections = features
+		r.ProjectConfig = true
+		r.ResolvedPresets = append([]string(nil), resolved.Presets...)
+	}
+	return l, nil
+}
+
+func fetchRepositoryAktionConfig(ctx context.Context, r RepoResolved, installationToken string) ([]byte, bool, error) {
+	owner, repo, err := parseGitHubRepoURL(r.URL)
+	if err != nil {
+		return nil, false, err
+	}
+	endpoint := fmt.Sprintf(
+		"https://api.github.com/repos/%s/%s/contents/.github/aktion.yml",
+		url.PathEscape(owner),
+		url.PathEscape(repo),
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+installationToken)
+	req.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
+	req.Header.Set("User-Agent", "aktion-manager/"+version)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, false, nil
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var e struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(body, &e)
+		if e.Message == "" {
+			e.Message = strings.TrimSpace(string(body))
+		}
+		if resp.StatusCode == http.StatusForbidden {
+			e.Message += "; the Aktion GitHub App needs Contents: Read permission"
+		}
+		return nil, false, fmt.Errorf("GitHub API %s: %s", resp.Status, e.Message)
+	}
+	var payload githubContentsFile
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, false, err
+	}
+	if payload.Type != "file" || payload.Encoding != "base64" {
+		return nil, false, fmt.Errorf("unexpected GitHub Contents response type=%q encoding=%q", payload.Type, payload.Encoding)
+	}
+	encoded := strings.ReplaceAll(payload.Content, "\n", "")
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, false, fmt.Errorf("decode repository config: %w", err)
+	}
+	return data, true, nil
+}
+
+func cmdConfigResolve(l Loaded, id string) int {
+	for _, r := range l.Repos {
+		if r.ID != id && r.ServiceID != normalizeID(id) {
+			continue
+		}
+		owner, repo, _ := parseGitHubRepoURL(r.URL)
+		payload := struct {
+			Repository string                    `json:"repository"`
+			ProjectConfig bool                    `json:"projectConfig"`
+			Presets    []string                  `json:"presets,omitempty"`
+			BaseImage  string                    `json:"baseImage"`
+			Image      string                    `json:"image"`
+			Features   runnerfeatures.Selections `json:"features"`
+		}{
+			Repository: owner + "/" + repo,
+			ProjectConfig: r.ProjectConfig,
+			Presets: r.ResolvedPresets,
+			BaseImage: r.BaseImage,
+			Image: r.Image,
+			Features: r.FeatureSelections,
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(payload); err != nil {
+			return fail(err)
+		}
+		return 0
+	}
+	return fail(fmt.Errorf("unknown enabled repository id %q", id))
 }
 
 func cmdFeatures() int {
@@ -1438,11 +1629,15 @@ func cmdDoctor(l Loaded) int {
 					} else {
 						perms, _ := inst["permissions"].(map[string]any)
 						admin, _ := perms["administration"].(string)
+						contents, _ := perms["contents"].(string)
 						detail := "reachable"
 						if admin != "" {
 							detail += ", administration=" + admin
 						}
-						checks(admin == "write", "GitHub", fmt.Sprintf("Installation %d", r.Installation), detail)
+						if contents != "" {
+							detail += ", contents=" + contents
+						}
+						checks(admin == "write" && (contents == "read" || contents == "write"), "GitHub", fmt.Sprintf("Installation %d", r.Installation), detail)
 					}
 					checkedInst[r.Installation] = true
 				}
