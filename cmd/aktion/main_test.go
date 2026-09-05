@@ -222,20 +222,23 @@ func TestRunnerFeaturesInheritanceAndExplicitDisable(t *testing.T) {
 	if err := os.WriteFile(key, []byte("placeholder"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg := `{
-  "app": {"clientId":"Iv123","installationId":123,"privateKeyFile":"./app.pem"},
-  "defaults": {
-    "scaleSetName":"home-docker",
-    "minRunners":0,
-    "maxRunners":1,
-    "runnerFeatures":["build","python"]
-  },
-  "repositories": [
-    {"id":"repo-a","url":"https://github.com/example/repo-a","enabled":true},
-    {"id":"repo-b","url":"https://github.com/example/repo-b","enabled":true,"runnerFeatures":[]},
-    {"id":"repo-c","url":"https://github.com/example/repo-c","enabled":true,"runnerFeatures":["gtk4"]}
-  ]
-}`
+	cfg := "{\n" +
+		"  \"app\": {\"clientId\":\"Iv123\",\"installationId\":123,\"privateKeyFile\":\"./app.pem\"},\n" +
+		"  \"defaults\": {\n" +
+		"    \"scaleSetName\":\"home-docker\",\n" +
+		"    \"minRunners\":0,\n" +
+		"    \"maxRunners\":1,\n" +
+		"    \"runnerFeatures\": {\n" +
+		"      \"builtin:build\": {},\n" +
+		"      \"ghcr.io/devcontainers/features/python:1\": {\"version\":\"os-provided\",\"installTools\":false}\n" +
+		"    }\n" +
+		"  },\n" +
+		"  \"repositories\": [\n" +
+		"    {\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true},\n" +
+		"    {\"id\":\"repo-b\",\"url\":\"https://github.com/example/repo-b\",\"enabled\":true,\"runnerFeatures\":{}},\n" +
+		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"runnerFeatures\":{\"builtin:gtk4\":{}}}\n" +
+		"  ]\n" +
+		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -247,15 +250,15 @@ func TestRunnerFeaturesInheritanceAndExplicitDisable(t *testing.T) {
 	for _, r := range loaded.Repos {
 		byID[r.ServiceID] = r
 	}
-	if got := strings.Join(byID["repo-a"].Features, ","); got != "build,python" {
+	if got := strings.Join(byID["repo-a"].Features, ","); !strings.Contains(got, "builtin:build") || !strings.Contains(got, "ghcr.io/devcontainers/features/python:1") {
 		t.Fatalf("repo-a features=%q", got)
 	}
 	if got := byID["repo-b"]; len(got.Features) != 0 || got.Image != "ghcr.io/actions/actions-runner:latest" {
 		t.Fatalf("repo-b should use unmodified base image: features=%v image=%q", got.Features, got.Image)
 	}
 	gotC := strings.Join(byID["repo-c"].Features, ",")
-	if !strings.Contains(gotC, "build") || !strings.Contains(gotC, "glib") || !strings.Contains(gotC, "gtk4") {
-		t.Fatalf("repo-c dependency closure=%q", gotC)
+	if gotC != "builtin:gtk4" {
+		t.Fatalf("repo-c configured features=%q", gotC)
 	}
 }
 
@@ -265,11 +268,11 @@ func TestDefaultRunnerFeaturesAreAppliedWhenOmitted(t *testing.T) {
 	if err := os.WriteFile(key, []byte("placeholder"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg := `{
-  "app": {"clientId":"Iv123","installationId":123,"privateKeyFile":"./app.pem"},
-  "defaults": {"scaleSetName":"home-docker","minRunners":0,"maxRunners":1},
-  "repositories": [{"id":"repo-a","url":"https://github.com/example/repo-a","enabled":true}]
-}`
+	cfg := "{\n" +
+		"  \"app\": {\"clientId\":\"Iv123\",\"installationId\":123,\"privateKeyFile\":\"./app.pem\"},\n" +
+		"  \"defaults\": {\"scaleSetName\":\"home-docker\",\"minRunners\":0,\"maxRunners\":1},\n" +
+		"  \"repositories\": [{\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true}]\n" +
+		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -277,10 +280,20 @@ func TestDefaultRunnerFeaturesAreAppliedWhenOmitted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Repos[0].Features) == 0 {
-		t.Fatal("omitted runnerFeatures should select Aktion defaults")
+	got := strings.Join(loaded.Repos[0].Features, ",")
+	for _, want := range []string{
+		"builtin:build",
+		"builtin:native",
+		"ghcr.io/devcontainers/features/common-utils:2",
+		"ghcr.io/devcontainers/features/python:1",
+		"ghcr.io/devcontainers/features/git-lfs:1",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("default features %q missing %q", got, want)
+		}
 	}
 	if !strings.HasPrefix(loaded.Repos[0].Image, "local/aktion-runner:") {
 		t.Fatalf("expected generated runner image, got %q", loaded.Repos[0].Image)
 	}
 }
+
