@@ -23,27 +23,26 @@ jobs:
       - name: Resolve modules
         run: go mod tidy
 
+      - name: Actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+
       - name: Test
         run: go test ./...
 
       - name: Vet
         run: go vet ./...
 
-      - name: Actionlint
-        run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          "$(go env GOPATH)/bin/actionlint"
-
-      - name: Build recovery binaries
+      - name: Build recovery artifacts
         shell: bash
-        run: |
-          mkdir -p dist
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/aktion-windows-amd64.exe ./cmd/aktion
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/aktion-linux-amd64 ./cmd/aktion
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/aktion-listener-linux-amd64 ./cmd/aktion-listener
+        env:
+          AKTION_VERSION: bootstrap-${{ github.sha }}
+        run: ./scripts/build-artifacts.sh dist
 
       - name: Upload recovery binaries
         uses: actions/upload-artifact@v4
         with:
-          name: aktion-bootstrap
+          name: aktion-bootstrap-${{ github.sha }}
           path: dist/*
+          retention-days: 7
