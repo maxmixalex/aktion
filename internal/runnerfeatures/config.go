@@ -19,9 +19,13 @@ type Options map[string]any
 type Selections map[string]Options
 
 func (s *Selections) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "null" {
 		*s = nil
 		return nil
+	}
+	if strings.HasPrefix(trimmed, "[") {
+		return fmt.Errorf("runnerFeatures now uses an object keyed by Feature URI, not the legacy string array")
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
