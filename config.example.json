@@ -10,7 +10,14 @@
     "maxRunners": 1,
     "logLevel": "info",
     "labels": "",
-    "runnerImage": ""
+    "runnerImage": "",
+    "runnerFeatures": [
+      "build",
+      "network",
+      "python",
+      "archives",
+      "native"
+    ]
   },
   "repositories": [
     {
@@ -23,7 +30,18 @@
       "url": "https://github.com/YOUR_NAME/YOUR_PRIVATE_REPO_B",
       "enabled": false,
       "minRunners": 1,
-      "maxRunners": 2
+      "maxRunners": 2,
+      "runnerFeatures": [
+        "build",
+        "network",
+        "python",
+        "archives",
+        "native",
+        "glib",
+        "gtk4",
+        "ncurses",
+        "lua54"
+      ]
     }
   ],
   "proxy": {
