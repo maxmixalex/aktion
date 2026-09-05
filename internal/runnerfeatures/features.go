@@ -3,212 +3,235 @@ package runnerfeatures
 import (
 	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
 	"strings"
 )
 
-//go:embed features/*/feature.json features/*/install.sh
-var files embed.FS
+const RuntimeLabel = "io.aktion.runner-feature-runtime"
 
-type Manifest struct {
-	ID            string   `json:"id"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	DependsOn     []string `json:"dependsOn"`
-	InstallsAfter []string `json:"installsAfter"`
+var builtinIDs = map[string]bool{
+	"build":   true,
+	"native":  true,
+	"glib":    true,
+	"gtk4":    true,
+	"ncurses": true,
+	"lua54":   true,
 }
 
-type Feature struct {
+//go:embed features/*/feature.json features/*/install.sh
+var builtinFiles embed.FS
+
+type OptionDefinition struct {
+	Type        string
+	Enum        []string
+	Proposals   []string
+	Default     any
+	Description string
+}
+
+type Mount struct {
+	Type     string
+	Source   string
+	Target   string
+	External bool
+}
+
+type Manifest struct {
+	ID               string
+	Version          string
+	Name             string
+	Description      string
+	DocumentationURL string
+	LicenseURL       string
+	Options          map[string]OptionDefinition
+	ContainerEnv     map[string]string
+	Privileged       bool
+	Init             bool
+	CapAdd           []string
+	SecurityOpt      []string
+	Entrypoint       string
+	Mounts           []Mount
+	DependsOn        map[string]json.RawMessage
+	InstallsAfter    []string
+	Deprecated       bool
+
+	OnCreateCommand      json.RawMessage
+	UpdateContentCommand json.RawMessage
+	PostCreateCommand    json.RawMessage
+	PostStartCommand     json.RawMessage
+	PostAttachCommand    json.RawMessage
+}
+
+type FeatureFile struct {
+	Path string
+	Mode os.FileMode
+	Data []byte
+}
+
+type FeaturePackage struct {
+	Reference      string
+	Identity       string
+	Canonical      string
+	ManifestDigest string
+	Manifest       Manifest
+	Files          []FeatureFile
+}
+
+type ResolvedFeature struct {
+	Reference string
+	Identity  string
+	Canonical string
+	Digest    string
+	Manifest  Manifest
+	Options   Options
+	Files     []FeatureFile
+	Builtin   bool
+}
+
+type RuntimeMount struct {
+	Type   string
+	Source string
+	Target string
+}
+
+type RuntimeConfig struct {
+	Init        bool
+	Privileged  bool
+	CapAdd      []string
+	SecurityOpt []string
+	Mounts      []RuntimeMount
+	Entrypoints []string
+}
+
+func EncodeRuntime(runtime RuntimeConfig) (string, error) {
+	data, err := json.Marshal(runtime)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(data), nil
+}
+
+func DecodeRuntime(encoded string) (RuntimeConfig, error) {
+	if strings.TrimSpace(encoded) == "" {
+		return RuntimeConfig{}, nil
+	}
+	data, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return RuntimeConfig{}, fmt.Errorf("decode feature runtime label: %w", err)
+	}
+	var runtime RuntimeConfig
+	if err := json.Unmarshal(data, &runtime); err != nil {
+		return RuntimeConfig{}, fmt.Errorf("parse feature runtime label: %w", err)
+	}
+	return runtime, nil
+}
+
+type builtinManifest struct {
+	ID            string
+	Name          string
+	Description   string
+	DependsOn     []string
+	InstallsAfter []string
+}
+
+type BuiltinFeature struct {
 	Manifest Manifest
 	Install  []byte
 	Digest   string
 }
 
-type Plan struct {
-	BaseImage  string
-	Features   []Feature
-	Image      string
-	Dockerfile string
-}
-
-var Default = []string{"build", "network", "python", "archives", "native"}
-
-func Catalog() (map[string]Feature, error) {
-	entries, err := fs.ReadDir(files, "features")
-	if err != nil {
-		return nil, err
+func Catalog() (map[string]BuiltinFeature, error) {
+	out := make(map[string]BuiltinFeature, len(builtinIDs))
+	ids := make([]string, 0, len(builtinIDs))
+	for id := range builtinIDs {
+		ids = append(ids, id)
 	}
-	out := make(map[string]Feature, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		id := entry.Name()
-		meta, err := files.ReadFile("features/" + id + "/feature.json")
+	sort.Strings(ids)
+	for _, id := range ids {
+		meta, err := fs.ReadFile(builtinFiles, "features/"+id+"/feature.json")
 		if err != nil {
 			return nil, err
 		}
-		install, err := files.ReadFile("features/" + id + "/install.sh")
+		install, err := fs.ReadFile(builtinFiles, "features/"+id+"/install.sh")
 		if err != nil {
 			return nil, err
 		}
-		var manifest Manifest
-		if err := json.Unmarshal(meta, &manifest); err != nil {
-			return nil, fmt.Errorf("feature %s: %w", id, err)
+		var raw builtinManifest
+		if err := json.Unmarshal(meta, &raw); err != nil {
+			return nil, fmt.Errorf("builtin feature %s: %w", id, err)
 		}
-		if manifest.ID != id || manifest.ID == "" {
-			return nil, fmt.Errorf("feature directory %q has id %q", id, manifest.ID)
+		if raw.ID != id || raw.ID == "" {
+			return nil, fmt.Errorf("builtin feature directory %q has id %q", id, raw.ID)
+		}
+		depends := map[string]json.RawMessage{}
+		for _, dep := range raw.DependsOn {
+			depends["builtin:"+dep] = json.RawMessage("{}")
+		}
+		installsAfter := make([]string, 0, len(raw.InstallsAfter))
+		for _, dep := range raw.InstallsAfter {
+			installsAfter = append(installsAfter, "builtin:"+dep)
 		}
 		h := sha256.New()
 		_, _ = h.Write(meta)
 		_, _ = h.Write([]byte{0})
 		_, _ = h.Write(install)
-		out[id] = Feature{Manifest: manifest, Install: install, Digest: hex.EncodeToString(h.Sum(nil))}
+		out[id] = BuiltinFeature{
+			Manifest: Manifest{
+				ID:            id,
+				Version:       "builtin",
+				Name:          raw.Name,
+				Description:   raw.Description,
+				DependsOn:     depends,
+				InstallsAfter: installsAfter,
+			},
+			Install: install,
+			Digest:  hex.EncodeToString(h.Sum(nil)),
+		}
 	}
 	return out, nil
 }
 
-func Resolve(requested []string) ([]Feature, error) {
+func loadBuiltin(ref string) (FeaturePackage, error) {
+	normalized, err := NormalizeReference(ref)
+	if err != nil {
+		return FeaturePackage{}, err
+	}
+	id := strings.TrimPrefix(normalized, "builtin:")
 	catalog, err := Catalog()
 	if err != nil {
-		return nil, err
+		return FeaturePackage{}, err
 	}
-	selected := map[string]bool{}
-	orderHint := map[string]int{}
-	var add func(string) error
-	add = func(id string) error {
-		id = strings.TrimSpace(id)
-		f, ok := catalog[id]
-		if !ok {
-			return fmt.Errorf("unknown runner feature %q", id)
-		}
-		if selected[id] {
-			return nil
-		}
-		selected[id] = true
-		if _, ok := orderHint[id]; !ok {
-			orderHint[id] = len(orderHint)
-		}
-		for _, dep := range f.Manifest.DependsOn {
-			if err := add(dep); err != nil {
-				return fmt.Errorf("feature %s depends on %s: %w", id, dep, err)
-			}
-		}
-		return nil
+	feature, ok := catalog[id]
+	if !ok {
+		return FeaturePackage{}, fmt.Errorf("unknown builtin feature %q", id)
 	}
-	for _, id := range requested {
-		if err := add(id); err != nil {
-			return nil, err
-		}
-	}
-
-	indegree := map[string]int{}
-	edges := map[string]map[string]bool{}
-	addEdge := func(from, to string) {
-		if from == to || !selected[from] || !selected[to] {
-			return
-		}
-		if edges[from] == nil {
-			edges[from] = map[string]bool{}
-		}
-		if !edges[from][to] {
-			edges[from][to] = true
-			indegree[to]++
-		}
-	}
-	for id := range selected {
-		indegree[id] += 0
-		f := catalog[id]
-		for _, dep := range f.Manifest.DependsOn {
-			addEdge(dep, id)
-		}
-		for _, after := range f.Manifest.InstallsAfter {
-			addEdge(after, id)
-		}
-	}
-
-	var result []Feature
-	for len(result) < len(selected) {
-		ready := make([]string, 0)
-		for id := range selected {
-			if indegree[id] == 0 {
-				already := false
-				for _, f := range result {
-					if f.Manifest.ID == id {
-						already = true
-						break
-					}
-				}
-				if !already {
-					ready = append(ready, id)
-				}
-			}
-		}
-		if len(ready) == 0 {
-			return nil, fmt.Errorf("runner feature dependency cycle detected")
-		}
-		sort.SliceStable(ready, func(i, j int) bool {
-			ai, aok := orderHint[ready[i]]
-			bi, bok := orderHint[ready[j]]
-			if aok != bok {
-				return aok
-			}
-			if aok && ai != bi {
-				return ai < bi
-			}
-			return ready[i] < ready[j]
-		})
-		id := ready[0]
-		result = append(result, catalog[id])
-		for to := range edges[id] {
-			indegree[to]--
-		}
-		indegree[id] = -1
-	}
-	return result, nil
+	return FeaturePackage{
+		Reference: normalized,
+		Identity:  normalized,
+		Canonical: normalized + "@" + feature.Digest,
+		Manifest:  feature.Manifest,
+		Files: []FeatureFile{
+			{Path: "install.sh", Mode: 0755, Data: feature.Install},
+		},
+		ManifestDigest: feature.Digest,
+	}, nil
 }
 
-func BuildPlan(baseImage string, requested []string) (Plan, error) {
-	if strings.TrimSpace(baseImage) == "" {
-		baseImage = "ghcr.io/actions/actions-runner:latest"
-	}
-	resolved, err := Resolve(requested)
-	if err != nil {
-		return Plan{}, err
-	}
-	if len(resolved) == 0 {
-		return Plan{BaseImage: baseImage, Features: nil, Image: baseImage}, nil
-	}
-	h := sha256.New()
-	_, _ = h.Write([]byte(baseImage))
-	for _, f := range resolved {
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write([]byte(f.Manifest.ID))
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write([]byte(f.Digest))
-	}
-	tag := "local/aktion-runner:" + hex.EncodeToString(h.Sum(nil))[:16]
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "FROM %s AS aktion-base\n", baseImage)
-	b.WriteString("USER root\n")
-	previous := "aktion-base"
-	for i, f := range resolved {
-		stage := fmt.Sprintf("aktion-feature-%02d-%s", i+1, f.Manifest.ID)
-		fmt.Fprintf(&b, "\nFROM %s AS %s\n", previous, stage)
-		fmt.Fprintf(&b, "COPY features/%s/install.sh /tmp/aktion-feature-install.sh\n", f.Manifest.ID)
-		b.WriteString("RUN chmod +x /tmp/aktion-feature-install.sh \\\n    && /tmp/aktion-feature-install.sh \\\n    && rm -f /tmp/aktion-feature-install.sh\n")
-		previous = stage
-	}
-	fmt.Fprintf(&b, "\nFROM %s AS final\n", previous)
-	b.WriteString("USER runner\n")
-	return Plan{BaseImage: baseImage, Features: resolved, Image: tag, Dockerfile: b.String()}, nil
+func hasLifecycleHook(m Manifest) bool {
+	return nonEmptyJSON(m.OnCreateCommand) ||
+		nonEmptyJSON(m.UpdateContentCommand) ||
+		nonEmptyJSON(m.PostCreateCommand) ||
+		nonEmptyJSON(m.PostStartCommand) ||
+		nonEmptyJSON(m.PostAttachCommand)
 }
 
-func InstallScript(id string) ([]byte, error) {
-	return files.ReadFile("features/" + id + "/install.sh")
+func nonEmptyJSON(raw json.RawMessage) bool {
+	v := strings.TrimSpace(string(raw))
+	return v != "" && v != "null"
 }
