@@ -54,27 +54,27 @@ type AppConfig struct {
 }
 
 type Defaults struct {
-	ScaleSetName   string   `json:"scaleSetName"`
-	MinRunners     *int     `json:"minRunners"`
-	MaxRunners     *int     `json:"maxRunners"`
-	LogLevel       string   `json:"logLevel"`
-	Labels         string   `json:"labels"`
-	RunnerImage    string   `json:"runnerImage"`
-	RunnerFeatures []string `json:"runnerFeatures,omitempty"`
+	ScaleSetName   string                    `json:"scaleSetName"`
+	MinRunners     *int                      `json:"minRunners"`
+	MaxRunners     *int                      `json:"maxRunners"`
+	LogLevel       string                    `json:"logLevel"`
+	Labels         string                    `json:"labels"`
+	RunnerImage    string                    `json:"runnerImage"`
+	RunnerFeatures runnerfeatures.Selections `json:"runnerFeatures,omitempty"`
 }
 
 type Repository struct {
-	ID             string   `json:"id"`
-	URL            string   `json:"url"`
-	Enabled        bool     `json:"enabled"`
-	InstallationID *int64   `json:"installationId,omitempty"`
-	ScaleSetName   string   `json:"scaleSetName,omitempty"`
-	MinRunners     *int     `json:"minRunners,omitempty"`
-	MaxRunners     *int     `json:"maxRunners,omitempty"`
-	LogLevel       string   `json:"logLevel,omitempty"`
-	Labels         string   `json:"labels,omitempty"`
-	RunnerImage    string   `json:"runnerImage,omitempty"`
-	RunnerFeatures []string `json:"runnerFeatures,omitempty"`
+	ID             string                    `json:"id"`
+	URL            string                    `json:"url"`
+	Enabled        bool                      `json:"enabled"`
+	InstallationID *int64                    `json:"installationId,omitempty"`
+	ScaleSetName   string                    `json:"scaleSetName,omitempty"`
+	MinRunners     *int                      `json:"minRunners,omitempty"`
+	MaxRunners     *int                      `json:"maxRunners,omitempty"`
+	LogLevel       string                    `json:"logLevel,omitempty"`
+	Labels         string                    `json:"labels,omitempty"`
+	RunnerImage    string                    `json:"runnerImage,omitempty"`
+	RunnerFeatures runnerfeatures.Selections `json:"runnerFeatures,omitempty"`
 }
 
 type RepoResolved struct {
@@ -87,8 +87,9 @@ type RepoResolved struct {
 	Log            string
 	LabelsResolved string
 	Image          string
-	BaseImage      string
-	Features       []string
+	BaseImage         string
+	Features          []string
+	FeatureSelections runnerfeatures.Selections
 }
 
 type Loaded struct {
@@ -448,9 +449,10 @@ func loadConfig(root, configName string) (Loaded, error) {
 	defLog := strOr(cfg.Defaults.LogLevel, "info")
 	defFeatures := cfg.Defaults.RunnerFeatures
 	if defFeatures == nil {
-		defFeatures = append([]string(nil), runnerfeatures.Default...)
+		defFeatures = runnerfeatures.DefaultSelections()
 	}
-	if _, err := runnerfeatures.Resolve(defFeatures); err != nil {
+	defFeatures, err = runnerfeatures.NormalizeSelections(defFeatures)
+	if err != nil {
 		return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
 	}
 	if err := validateCapacity("defaults", defMin, defMax); err != nil {
@@ -489,18 +491,18 @@ func loadConfig(root, configName string) (Loaded, error) {
 		if r.InstallationID != nil {
 			inst = *r.InstallationID
 		}
-		features := defFeatures
+		features := runnerfeatures.CloneSelections(defFeatures)
 		if r.RunnerFeatures != nil {
-			features = r.RunnerFeatures
+			features, err = runnerfeatures.NormalizeSelections(r.RunnerFeatures)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
+			}
 		}
-		plan, err := runnerfeatures.BuildPlan(strOr(r.RunnerImage, cfg.Defaults.RunnerImage), features)
+		imageName, baseImage, err := runnerfeatures.ImageName(strOr(r.RunnerImage, cfg.Defaults.RunnerImage), features)
 		if err != nil {
 			return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
 		}
-		featureIDs := make([]string, 0, len(plan.Features))
-		for _, f := range plan.Features {
-			featureIDs = append(featureIDs, f.Manifest.ID)
-		}
+		featureIDs := runnerfeatures.SelectionKeys(features)
 		repos = append(repos, RepoResolved{
 			Repository:     r,
 			ServiceID:      sid,
@@ -510,9 +512,10 @@ func loadConfig(root, configName string) (Loaded, error) {
 			Max:            max,
 			Log:            strOr(r.LogLevel, defLog),
 			LabelsResolved: strOr(r.Labels, cfg.Defaults.Labels),
-			Image:          plan.Image,
-			BaseImage:      plan.BaseImage,
-			Features:       featureIDs,
+			Image:             imageName,
+			BaseImage:         baseImage,
+			Features:          featureIDs,
+			FeatureSelections: features,
 		})
 	}
 	if len(repos) == 0 {
@@ -527,49 +530,63 @@ func cmdFeatures() int {
 	if err != nil {
 		return fail(err)
 	}
+	defaults := runnerfeatures.DefaultSelections()
+	rows := make([][]tableCell, 0, len(catalog)+len(defaults))
+	for _, ref := range runnerfeatures.SelectionKeys(defaults) {
+		if strings.HasPrefix(ref, "builtin:") {
+			continue
+		}
+		rows = append(rows, []tableCell{
+			accentCell(ref),
+			goodCell("DEFAULT"),
+			cell("OCI Dev Container Feature"),
+			mutedCell("publisher-managed"),
+		})
+	}
 	ids := make([]string, 0, len(catalog))
 	for id := range catalog {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	defaults := map[string]bool{}
-	for _, id := range runnerfeatures.Default {
-		defaults[id] = true
-	}
-	rows := make([][]tableCell, 0, len(ids))
 	for _, id := range ids {
-		f := catalog[id]
+		ref := "builtin:" + id
 		def := ""
-		if defaults[id] {
+		if _, ok := defaults[ref]; ok {
 			def = "DEFAULT"
 		}
-		deps := strings.Join(f.Manifest.DependsOn, ", ")
+		f := catalog[id]
+		deps := make([]string, 0, len(f.Manifest.DependsOn))
+		for dep := range f.Manifest.DependsOn {
+			deps = append(deps, dep)
+		}
+		sort.Strings(deps)
 		rows = append(rows, []tableCell{
-			accentCell(id),
+			accentCell(ref),
 			mutedCell(def),
 			cell(f.Manifest.Description),
-			mutedCell(deps),
+			mutedCell(strings.Join(deps, ", ")),
 		})
 	}
 	ui.section("Runner features")
-	fmt.Println(ui.table([]string{"ID", "DEFAULT", "DESCRIPTION", "DEPENDS ON"}, rows))
+	fmt.Println(ui.table([]string{"FEATURE", "DEFAULT", "DESCRIPTION", "DEPENDS ON"}, rows))
 	fmt.Println()
-	fmt.Println(ui.renderStyle("muted", `Omit defaults.runnerFeatures to use the default feature set; use [] for the unmodified base runner image.`))
+	fmt.Println(ui.renderStyle("muted", "Any public OCI Dev Container Feature URI is supported, e.g. ghcr.io/devcontainers/features/node:1."))
+	fmt.Println(ui.renderStyle("muted", "Omit defaults.runnerFeatures to use Aktion defaults; use {} for the unmodified base runner image."))
 	return 0
 }
 
 func ensureRunnerFeatureImages(l Loaded) error {
 	type imageBuild struct {
-		Base     string
-		Features []string
-		Image    string
+		Base       string
+		Selections runnerfeatures.Selections
+		Image      string
 	}
 	unique := map[string]imageBuild{}
 	for _, r := range l.Repos {
-		if len(r.Features) == 0 || r.Image == r.BaseImage {
+		if len(r.FeatureSelections) == 0 || r.Image == r.BaseImage {
 			continue
 		}
-		unique[r.Image] = imageBuild{Base: r.BaseImage, Features: r.Features, Image: r.Image}
+		unique[r.Image] = imageBuild{Base: r.BaseImage, Selections: r.FeatureSelections, Image: r.Image}
 	}
 	if len(unique) == 0 {
 		return nil
@@ -579,35 +596,34 @@ func ensureRunnerFeatureImages(l Loaded) error {
 		keys = append(keys, image)
 	}
 	sort.Strings(keys)
+	resolver := runnerfeatures.NewResolver(runnerfeatures.DefaultCacheDir())
+	ctx := context.Background()
 	for _, image := range keys {
 		build := unique[image]
-		plan, err := runnerfeatures.BuildPlan(build.Base, build.Features)
+		fmt.Printf("Resolving runner features for %s\n", image)
+		plan, err := resolver.ResolvePlan(ctx, build.Base, build.Selections)
 		if err != nil {
 			return err
 		}
 		if plan.Image != build.Image {
 			return fmt.Errorf("runner image plan changed unexpectedly: %s != %s", plan.Image, build.Image)
 		}
+		for _, warning := range plan.Warnings {
+			fmt.Println(ui.renderStyle("warn", "warning: "+warning))
+		}
 		dir, err := os.MkdirTemp("", "aktion-runner-image-")
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(plan.Dockerfile), 0644); err != nil {
+		if err := runnerfeatures.WriteBuildContext(plan, dir); err != nil {
 			os.RemoveAll(dir)
 			return err
 		}
+		refs := make([]string, 0, len(plan.Features))
 		for _, feature := range plan.Features {
-			featureDir := filepath.Join(dir, "features", feature.Manifest.ID)
-			if err := os.MkdirAll(featureDir, 0755); err != nil {
-				os.RemoveAll(dir)
-				return err
-			}
-			if err := os.WriteFile(filepath.Join(featureDir, "install.sh"), feature.Install, 0755); err != nil {
-				os.RemoveAll(dir)
-				return err
-			}
+			refs = append(refs, feature.Reference)
 		}
-		fmt.Printf("Building runner image %s (%s)\n", image, strings.Join(build.Features, ", "))
+		fmt.Printf("Building runner image %s (%s)\n", image, strings.Join(refs, ", "))
 		code := runStreaming(dir, "docker", "build", "-t", image, ".")
 		os.RemoveAll(dir)
 		if code != 0 {
