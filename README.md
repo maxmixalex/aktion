@@ -2,9 +2,9 @@
 
 **Self-hosted GitHub Actions without Kubernetes.**
 
-Aktion is a lightweight manager for GitHub Runner Scale Sets on a Docker host. It keeps a small repository-scoped listener online, scales Linux runner containers from zero when GitHub assigns jobs, and removes each runner after one job.
+Aktion is a lightweight GitHub Runner Scale Set manager for Docker hosts. It keeps one small repository-scoped listener online, creates ephemeral Linux runner containers when GitHub assigns jobs, and removes each runner after one job.
 
-> **Linux runners only.** The Aktion manager itself is cross-platform and is intended to run on Windows, Linux, or macOS wherever the Docker CLI can reach a Linux Docker Engine/Desktop.
+> **Linux runners only.** The Aktion manager itself is cross-platform and can run on Windows, Linux, or macOS wherever the Docker CLI can reach a Docker daemon capable of running Linux containers. Docker Desktop is only one possible daemon provider.
 
 ## Why
 
@@ -13,9 +13,9 @@ Aktion is a lightweight manager for GitHub Runner Scale Sets on a Docker host. I
 - one configuration for multiple private repositories
 - per-repository `minRunners` / `maxRunners`
 - rich terminal status with repo → runner → job visibility and OSC 8 links
-- stale scale-set diagnosis and cleanup
+- stale scale-set reconciliation and cleanup
 - optional HTTP/HTTPS proxy forwarding into listener and job containers
-- composable runner image features
+- OCI Dev Container Features for runner environments
 - no Kubernetes / ARC cluster required
 
 Aktion uses GitHub's standalone [`actions/scaleset`](https://github.com/actions/scaleset) client for the Runner Scale Set protocol.
@@ -38,10 +38,11 @@ ephemeral Linux runner containers
 aktion (manager, Windows/Linux/macOS)
       ├─ renders Compose
       ├─ manages listeners
+      ├─ resolves OCI Dev Container Features
       ├─ builds feature-composed runner images
       ├─ diagnoses GitHub App / Docker state
       ├─ shows jobs and runners
-      └─ cleans stale scale sets
+      └─ reconciles stale scale sets
 ```
 
 ## Configuration
@@ -59,10 +60,23 @@ Copy `config.example.json` to `config.json`, place the GitHub App PEM under `sec
     "scaleSetName": "home-docker",
     "minRunners": 0,
     "maxRunners": 1,
-    "logLevel": "info",
-    "labels": "",
-    "runnerImage": "",
-    "runnerFeatures": ["build", "network", "python", "archives", "native"]
+    "runnerFeatures": {
+      "builtin:build": {},
+      "builtin:native": {},
+      "ghcr.io/devcontainers/features/common-utils:2": {
+        "installZsh": false,
+        "installOhMyZsh": false,
+        "upgradePackages": false,
+        "username": "none"
+      },
+      "ghcr.io/devcontainers/features/python:1": {
+        "version": "os-provided",
+        "installTools": false
+      },
+      "ghcr.io/devcontainers/features/git-lfs:1": {
+        "autoPull": false
+      }
+    }
   },
   "repositories": [
     {
@@ -71,12 +85,7 @@ Copy `config.example.json` to `config.json`, place the GitHub App PEM under `sec
       "enabled": true,
       "maxRunners": 3
     }
-  ],
-  "proxy": {
-    "http": "",
-    "https": "",
-    "noProxy": "localhost,127.0.0.1"
-  }
+  ]
 }
 ```
 
@@ -84,35 +93,56 @@ Repository values override `defaults`; omitted values inherit them.
 
 ## Runner Features
 
-Aktion can build a runner image from small composable features instead of forcing every project onto one giant image. Built-in features are declared with metadata plus an idempotent `install.sh`, inspired by Dev Container Features. Hard dependencies are resolved with `dependsOn`; `installsAfter` provides a soft ordering edge when both features are selected.
-
-The default feature set is:
+`runnerFeatures` follows the Dev Container Features object model: keys are Feature identifiers and values are option objects. Public OCI Features can be referenced directly:
 
 ```json
-"runnerFeatures": ["build", "network", "python", "archives", "native"]
-```
-
-This provides common compiler/build tooling, source/network utilities, Python, archive tools, and common native development headers. Optional features include `glib`, `gtk4`, `ncurses`, and `lua54`.
-
-A repository can replace the inherited feature set:
-
-```json
-{
-  "id": "desktop-native",
-  "url": "https://github.com/example/desktop-native",
-  "enabled": true,
-  "runnerFeatures": [
-    "build", "network", "python", "archives", "native",
-    "gtk4", "ncurses", "lua54"
-  ]
+"runnerFeatures": {
+  "ghcr.io/devcontainers/features/node:1": {
+    "version": "lts"
+  },
+  "ghcr.io/devcontainers/features/go:1": {
+    "version": "latest"
+  },
+  "ghcr.io/devcontainers/features/rust:1": {}
 }
 ```
 
-Omit `runnerFeatures` to inherit; set it to `[]` to use the base runner image unchanged. `runnerImage` is the base image onto which features are applied.
+The Dev Container shorthand form is also accepted, so a string value maps to the `version` option and `false` disables a Feature.
 
-Each resolved feature becomes its own Docker build stage/layer. Aktion hashes the base image reference plus resolved feature contents and reuses the same generated image for repositories with the same plan. `aktion features` lists the built-in catalog.
+Aktion resolves OCI manifests and Feature tar layers directly from the registry, validates content digests, recursively resolves `dependsOn`, respects `installsAfter`, validates option types/defaults/enums, and gives every resolved Feature its own Docker build stage. Feature blobs are cached by digest under the user's cache directory.
 
-The current built-ins target Debian/Ubuntu-style runner images because their install scripts use `apt`.
+Runtime Feature metadata is propagated to ephemeral runners:
+
+- `containerEnv`
+- `init`
+- `privileged`
+- `capAdd`
+- `securityOpt`
+- `mounts`
+- `entrypoint`
+
+This is important for official Features such as Go/Rust, which request ptrace/seccomp settings, and Docker/Nix Features, which need runtime configuration.
+
+Dev Container lifecycle hooks (`onCreateCommand`, `postCreateCommand`, and related hooks) are intentionally not executed. GitHub Actions creates the job workspace after the runner starts, so those dev-container lifecycle semantics do not map cleanly to an ephemeral Actions runner. Aktion prints a warning when a selected Feature declares them.
+
+Aktion keeps a small builtin catalog only where the official Dev Container collection has no equivalent:
+
+- `builtin:build`
+- `builtin:native`
+- `builtin:glib`
+- `builtin:gtk4`
+- `builtin:ncurses`
+- `builtin:lua54`
+
+The former builtin `network`, `archives`, and `python` Features were removed. The default environment now uses official `common-utils`, `python`, and `git-lfs` OCI Features instead.
+
+Omit `runnerFeatures` to inherit the default set; set it to `{}` to use `runnerImage` unchanged. `runnerImage` is the base image onto which Features are applied.
+
+`aktion features` lists Aktion builtins and the default OCI Features. Any compatible public OCI Dev Container Feature may be referenced even if it is not listed there.
+
+### Current OCI scope
+
+Public OCI registries using anonymous/Bearer-token pull are supported. Private registry credentials are not yet wired into Aktion.
 
 ## Proxy
 
@@ -164,12 +194,10 @@ Aktion requires Go 1.25.3 or newer because the current `actions/scaleset` depend
 go mod tidy
 go test ./...
 go vet ./...
-go build -o dist/aktion ./cmd/aktion
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/aktion-listener-linux-amd64 ./cmd/aktion-listener
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dist/aktion-listener-linux-arm64 ./cmd/aktion-listener
+bash ./scripts/build-artifacts.sh dist
 ```
 
-The manager is portable; release CI cross-compiles it for Windows, Linux and macOS. The listener is intentionally Linux-only.
+Release CI cross-compiles the manager for Linux, Windows, and macOS on amd64/arm64. The listener is intentionally Linux-only and is built for amd64/arm64.
 
 ## CI bootstrap
 
