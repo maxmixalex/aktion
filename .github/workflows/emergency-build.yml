@@ -1,4 +1,4 @@
-name: Bootstrap
+name: Emergency build
 
 on:
   workflow_dispatch:
@@ -7,15 +7,15 @@ permissions:
   contents: read
 
 jobs:
-  bootstrap:
-    name: Emergency hosted build
+  build:
+    name: GitHub-hosted recovery build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: '1.25.3'
           cache: true
@@ -37,12 +37,12 @@ jobs:
       - name: Build recovery artifacts
         shell: bash
         env:
-          AKTION_VERSION: bootstrap-${{ github.sha }}
+          AKTION_VERSION: emergency-${{ github.sha }}
         run: bash ./scripts/build-artifacts.sh dist
 
       - name: Upload recovery binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: aktion-bootstrap-${{ github.sha }}
+          name: aktion-emergency-${{ github.sha }}
           path: dist/*
           retention-days: 7

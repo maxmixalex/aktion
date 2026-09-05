@@ -62,7 +62,7 @@ jobs:
   build:
     runs-on: home-docker
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: echo hello
 ```
 
