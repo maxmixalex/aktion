@@ -1,0 +1,52 @@
+[project]
+site_name = "Aktion"
+site_description = "Self-hosted GitHub Actions runners without Kubernetes"
+site_url = "https://zyf722.github.io/aktion/en/"
+docs_dir = "docs/en"
+site_dir = "site/en"
+nav = [
+  { "Home" = "index.md" },
+  { "Quick start" = "getting-started.md" },
+  { "Guides" = [
+    { "Add repositories" = "guides/repositories.md" },
+    { "Runner capacity" = "guides/capacity.md" },
+    { "Runner environment" = "guides/runner-environment.md" },
+    { "HTTP/HTTPS proxy" = "guides/proxy.md" },
+  ] },
+  { "Operate Aktion" = "operations.md" },
+  { "How Aktion works" = "concepts/how-it-works.md" },
+  { "Reference" = [
+    { "Configuration" = "reference/configuration.md" },
+    { "CLI" = "reference/cli.md" },
+  ] },
+  { "Troubleshooting" = "troubleshooting.md" },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "navigation.instant",
+  "navigation.instant.progress",
+  "navigation.sections",
+  "navigation.path",
+  "navigation.top",
+  "content.code.copy",
+]
+
+[project.extra]
+alternate = [
+  { name = "简体中文", link = "/aktion/", lang = "zh" },
+  { name = "English", link = "/aktion/en/", lang = "en" },
+]
+
+[project.markdown_extensions]
+admonition = {}
+tables = {}
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.tabbed.alternate_style = true
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]

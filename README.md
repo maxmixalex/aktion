@@ -13,7 +13,11 @@ Aktion runs repository-scoped GitHub Runner Scale Set listeners on a normal Dock
 
 ## Documentation
 
-User documentation is published at:
+English user documentation:
+
+**https://zyf722.github.io/aktion/en/**
+
+中文文档：
 
 **https://zyf722.github.io/aktion/**
 
