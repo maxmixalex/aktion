@@ -29,6 +29,9 @@ jobs:
       - name: Resolve modules
         run: go mod tidy
 
+      - name: Verify modules are tidy
+        run: git diff --exit-code -- go.mod go.sum
+
       - name: Actionlint
         shell: bash
         run: |
