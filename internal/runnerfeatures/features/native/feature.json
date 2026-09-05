@@ -1,0 +1,1 @@
+{"id":"native","name":"Common native libraries","description":"Frequently required development headers for native builds","dependsOn":["build"],"installsAfter":[]}
