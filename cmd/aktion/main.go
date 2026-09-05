@@ -338,7 +338,7 @@ Usage:
 
 Commands:
   init              Create config.json from config.example.json
-  features          List built-in runner image features
+  features          List Aktion builtins and default OCI Features
   config            Render and validate Compose configuration
   render            Generate compose.generated.yaml
   up                Build/start all enabled listeners
