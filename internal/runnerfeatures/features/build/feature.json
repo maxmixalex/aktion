@@ -1,0 +1,1 @@
+{"id":"build","name":"Build toolchain","description":"Common C/C++ and autotools build toolchain","dependsOn":[],"installsAfter":[]}
