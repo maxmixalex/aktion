@@ -146,7 +146,7 @@ jobs:
 aktion status
 ```
 
-你应该短暂看到一个 ephemeral runner 和一个 active job；job 完成后，该 runner container 会被销毁。如果 workflow 一直显示等待 runner，转到[Workflow 一直等待 runner](troubleshooting.md#workflow-一直等待-runner)。
+你应该短暂看到一个 ephemeral runner 和一个 active job；job 完成后，该 runner container 会被销毁。如果 workflow 一直显示等待 runner，转到[Workflow 一直等待 runner](troubleshooting.md)。
 
 ## 下一步
 
