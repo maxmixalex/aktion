@@ -25,6 +25,7 @@ func init() {
 	flags.StringVar(&cfg.ScaleSetName, "name", "", "REQUIRED: Name of your scale set")
 	flags.StringSliceVar(&cfg.Labels, "labels", nil, "Labels for workflow targeting (comma-separated or repeated). Defaults to --name if not provided.")
 	flags.StringVar(&cfg.RunnerGroup, "runner-group", scaleset.DefaultRunnerGroup, "Name of the runner group your scale set should belong to")
+	flags.StringVar(&cfg.RunnerImage, "runner-image", "ghcr.io/actions/actions-runner:latest", "Linux runner container image")
 	flags.StringVar(&cfg.GitHubApp.ClientID, "app-client-id", "", "GitHub App client id")
 	flags.Int64Var(&cfg.GitHubApp.InstallationID, "app-installation-id", 0, "GitHub App installation ID")
 	flags.StringVar(&cfg.GitHubApp.PrivateKey, "app-private-key", "", "GitHub App private key")
