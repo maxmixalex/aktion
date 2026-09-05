@@ -41,12 +41,15 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Build manager
-        run: go build -o dist/aktion ./cmd/aktion
-
-      - name: Build listener
+      - name: Cross-build manager and listener
+        shell: bash
         env:
-          CGO_ENABLED: '0'
-          GOOS: linux
-          GOARCH: amd64
-        run: go build -o dist/aktion-listener-linux-amd64 ./cmd/aktion-listener
+          AKTION_VERSION: ci-${{ github.sha }}
+        run: ./scripts/build-artifacts.sh dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aktion-ci-${{ github.sha }}
+          path: dist/*
+          retention-days: 7
