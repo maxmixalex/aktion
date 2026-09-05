@@ -1,0 +1,1 @@
+{"id":"gtk4","name":"GTK 4 development","description":"GTK 4 development headers and dependencies","dependsOn":["glib"],"installsAfter":["native"]}
