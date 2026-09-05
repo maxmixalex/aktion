@@ -58,6 +58,15 @@ func TestSelectionsDecodeDevContainerStyleValues(t *testing.T) {
 	}
 }
 
+
+func TestSelectionsRejectLegacyArray(t *testing.T) {
+	var selections Selections
+	err := json.Unmarshal([]byte("[\"build\",\"python\"]"), &selections)
+	if err == nil || !strings.Contains(err.Error(), "legacy string array") {
+		t.Fatalf("unexpected legacy config error: %v", err)
+	}
+}
+
 func TestImageNameIsStableWithoutNetwork(t *testing.T) {
 	features := Selections{
 		"builtin:build": {},
@@ -217,6 +226,29 @@ func TestExtractFeatureArchive(t *testing.T) {
 	}
 	if len(files) != 1 || files[0].Path != "install.sh" || string(files[0].Data) != string(data) {
 		t.Fatalf("unexpected archive: %#v", files)
+	}
+}
+
+
+func TestExtractFeatureArchiveRejectsTraversal(t *testing.T) {
+	var compressed bytes.Buffer
+	gz := gzip.NewWriter(&compressed)
+	tw := tar.NewWriter(gz)
+	data := []byte("bad")
+	if err := tw.WriteHeader(&tar.Header{Name: "../escape", Mode: 0644, Size: int64(len(data)), Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := extractFeatureArchive(compressed.Bytes()); err == nil {
+		t.Fatal("expected traversal archive to be rejected")
 	}
 }
 
