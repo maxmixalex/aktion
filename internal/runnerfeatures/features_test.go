@@ -6,8 +6,11 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
@@ -223,4 +226,41 @@ func featureIDs(features []ResolvedFeature) []string {
 		out = append(out, feature.Manifest.ID)
 	}
 	return out
+}
+
+
+func TestOfficialOCIDefaults(t *testing.T) {
+	if os.Getenv("AKTION_TEST_OCI") != "1" {
+		t.Skip("set AKTION_TEST_OCI=1 to resolve public official OCI Features")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	resolver := NewResolver(t.TempDir())
+	plan, err := resolver.ResolvePlan(ctx, DefaultBaseImage, DefaultSelections())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(featureIDs(plan.Features), ",")
+	for _, want := range []string{"build", "native", "common-utils", "python", "git-lfs"} {
+		if !strings.Contains(","+got+",", ","+want+",") {
+			t.Fatalf("official default plan %q missing %q", got, want)
+		}
+	}
+	if !strings.Contains(plan.Dockerfile, "INSTALLTOOLS='false'") {
+		t.Fatalf("official Python options were not mapped into Dockerfile:\n%s", plan.Dockerfile)
+	}
+	if os.Getenv("AKTION_TEST_DOCKER") != "1" {
+		return
+	}
+	dir := t.TempDir()
+	if err := WriteBuildContext(plan, dir); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(ctx, "docker", "build", "-t", "local/aktion-oci-smoke:test", ".")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("build official OCI feature runner image: %v", err)
+	}
 }
