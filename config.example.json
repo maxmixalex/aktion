@@ -11,13 +11,25 @@
     "logLevel": "info",
     "labels": "",
     "runnerImage": "",
-    "runnerFeatures": [
-      "build",
-      "network",
-      "python",
-      "archives",
-      "native"
-    ]
+    "runnerFeatures": {
+      "builtin:build": {},
+      "builtin:native": {},
+      "ghcr.io/devcontainers/features/common-utils:2": {
+        "installZsh": false,
+        "configureZshAsDefaultShell": false,
+        "installOhMyZsh": false,
+        "installOhMyZshConfig": false,
+        "upgradePackages": false,
+        "username": "none"
+      },
+      "ghcr.io/devcontainers/features/python:1": {
+        "version": "os-provided",
+        "installTools": false
+      },
+      "ghcr.io/devcontainers/features/git-lfs:1": {
+        "autoPull": false
+      }
+    }
   },
   "repositories": [
     {
@@ -31,17 +43,34 @@
       "enabled": false,
       "minRunners": 1,
       "maxRunners": 2,
-      "runnerFeatures": [
-        "build",
-        "network",
-        "python",
-        "archives",
-        "native",
-        "glib",
-        "gtk4",
-        "ncurses",
-        "lua54"
-      ]
+      "runnerFeatures": {
+        "builtin:build": {},
+        "builtin:native": {},
+        "builtin:glib": {},
+        "builtin:gtk4": {},
+        "builtin:ncurses": {},
+        "builtin:lua54": {},
+        "ghcr.io/devcontainers/features/common-utils:2": {
+          "installZsh": false,
+          "installOhMyZsh": false,
+          "upgradePackages": false,
+          "username": "none"
+        },
+        "ghcr.io/devcontainers/features/python:1": {
+          "version": "os-provided",
+          "installTools": false
+        },
+        "ghcr.io/devcontainers/features/git-lfs:1": {
+          "autoPull": false
+        },
+        "ghcr.io/devcontainers/features/node:1": {
+          "version": "lts"
+        },
+        "ghcr.io/devcontainers/features/go:1": {
+          "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/rust:1": {}
+      }
     }
   ],
   "proxy": {
