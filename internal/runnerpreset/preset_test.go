@@ -36,7 +36,7 @@ func TestMergeFeaturesOverridesAndDeletes(t *testing.T) {
 	}
 	got, err := MergeFeatures(base, runnerfeatures.Selections{
 		"builtin:build": nil,
-		"builtin:gtk4": {},
+		"builtin:svn": {},
 		"ghcr.io/devcontainers/features/python:1": {"version": "3.13"},
 	})
 	if err != nil {
@@ -45,8 +45,8 @@ func TestMergeFeaturesOverridesAndDeletes(t *testing.T) {
 	if _, ok := got["builtin:build"]; ok {
 		t.Fatal("build should be removed")
 	}
-	if _, ok := got["builtin:gtk4"]; !ok {
-		t.Fatal("gtk4 should be added")
+	if _, ok := got["builtin:svn"]; !ok {
+		t.Fatal("svn should be added")
 	}
 	python := got["ghcr.io/devcontainers/features/python:1"]
 	if python["version"] != "3.13" || python["installTools"] != false {
@@ -55,7 +55,7 @@ func TestMergeFeaturesOverridesAndDeletes(t *testing.T) {
 }
 
 func TestFetchRunnerPreset(t *testing.T) {
-	body := []byte(`{"version":1,"runnerFeatures":{"builtin:build":{},"builtin:gtk4":{}}}`)
+	body := []byte(`{"version":1,"runnerFeatures":{"builtin:build":{},"builtin:svn":{}}}`)
 	layerDigest := ociregistry.DigestBytes(body)
 	var server *httptest.Server
 	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,7 @@ func TestFetchRunnerPreset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := got.RunnerFeatures["builtin:gtk4"]; !ok {
+	if _, ok := got.RunnerFeatures["builtin:svn"]; !ok {
 		t.Fatalf("features=%#v", got.RunnerFeatures)
 	}
 	if !strings.Contains(got.Canonical, "@sha256:") {

@@ -6,6 +6,15 @@ on:
       - main
     paths:
       - '.github/workflows/verify-oci-features.yml'
+      - 'internal/runnerfeatures/**'
+      - 'internal/ociregistry/**'
+      - 'internal/runnerpreset/**'
+  pull_request:
+    paths:
+      - '.github/workflows/verify-oci-features.yml'
+      - 'internal/runnerfeatures/**'
+      - 'internal/ociregistry/**'
+      - 'internal/runnerpreset/**'
 
 permissions:
   contents: read

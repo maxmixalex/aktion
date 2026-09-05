@@ -236,7 +236,7 @@ func TestRunnerFeaturesHostSideExtendsDefaults(t *testing.T) {
 		"  \"repositories\": [\n" +
 		"    {\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true},\n" +
 		"    {\"id\":\"repo-b\",\"url\":\"https://github.com/example/repo-b\",\"enabled\":true,\"runnerFeatures\":{}},\n" +
-		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"extends\":\"defaults\",\"runnerFeatures\":{\"builtin:build\":false,\"builtin:gtk4\":{},\"ghcr.io/devcontainers/features/python:1\":{\"version\":\"3.13\"}}}\n" +
+		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"extends\":\"defaults\",\"runnerFeatures\":{\"builtin:build\":false,\"builtin:svn\":{},\"ghcr.io/devcontainers/features/python:1\":{\"version\":\"3.13\"}}}\n" +
 		"  ]\n" +
 		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
@@ -258,7 +258,7 @@ func TestRunnerFeaturesHostSideExtendsDefaults(t *testing.T) {
 	}
 	gotC := byID["repo-c"]
 	featuresC := strings.Join(gotC.Features, ",")
-	if strings.Contains(featuresC, "builtin:build") || !strings.Contains(featuresC, "builtin:gtk4") || !strings.Contains(featuresC, "ghcr.io/devcontainers/features/python:1") {
+	if strings.Contains(featuresC, "builtin:build") || !strings.Contains(featuresC, "builtin:svn") || !strings.Contains(featuresC, "ghcr.io/devcontainers/features/python:1") {
 		t.Fatalf("repo-c extended features=%q", featuresC)
 	}
 	python := gotC.FeatureSelections["ghcr.io/devcontainers/features/python:1"]
@@ -308,6 +308,7 @@ func TestDefaultRunnerFeaturesAreAppliedWhenOmitted(t *testing.T) {
 	for _, want := range []string{
 		"builtin:build",
 		"builtin:native",
+		"builtin:clang",
 		"ghcr.io/devcontainers/features/common-utils:2",
 		"ghcr.io/devcontainers/features/python:1",
 		"ghcr.io/devcontainers/features/git-lfs:1",

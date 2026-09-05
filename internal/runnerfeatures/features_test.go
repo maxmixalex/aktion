@@ -21,15 +21,33 @@ func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
 		"ghcr.io/devcontainers/features/git-lfs:1",
 		"builtin:build",
 		"builtin:native",
+		"builtin:clang",
 	} {
 		if _, ok := defaults[ref]; !ok {
 			t.Fatalf("default selections missing %q: %#v", ref, defaults)
 		}
 	}
-	for _, removed := range []string{"builtin:network", "builtin:python", "builtin:archives"} {
+	for _, removed := range []string{"builtin:network", "builtin:python", "builtin:archives", "builtin:glib", "builtin:gtk4", "builtin:ncurses"} {
 		if _, ok := defaults[removed]; ok {
 			t.Fatalf("legacy builtin %q must not remain in defaults", removed)
 		}
+	}
+}
+
+func TestBuiltinClangFeature(t *testing.T) {
+	catalog, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clang, ok := catalog["clang"]
+	if !ok {
+		t.Fatalf("clang builtin missing from catalog: %#v", catalog)
+	}
+	if !strings.Contains(string(clang.Install), "apt-get install -y --no-install-recommends clang") {
+		t.Fatalf("clang install script=%q", string(clang.Install))
+	}
+	if _, err := loadBuiltin("builtin:clang"); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -297,7 +315,7 @@ func TestOfficialOCIDefaults(t *testing.T) {
 	if os.Getenv("AKTION_TEST_OCI") != "1" {
 		t.Skip("set AKTION_TEST_OCI=1 to resolve public official OCI Features")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	resolver := NewResolver(t.TempDir())
 	plan, err := resolver.ResolvePlan(ctx, DefaultBaseImage, DefaultSelections())
@@ -305,7 +323,7 @@ func TestOfficialOCIDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.Join(featureIDs(plan.Features), ",")
-	for _, want := range []string{"build", "native", "common-utils", "python", "git-lfs"} {
+	for _, want := range []string{"build", "native", "clang", "common-utils", "python", "git-lfs"} {
 		if !strings.Contains(","+got+",", ","+want+",") {
 			t.Fatalf("official default plan %q missing %q", got, want)
 		}
@@ -346,5 +364,17 @@ func TestOfficialOCIDefaults(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("build official OCI feature runner image: %v", err)
+	}
+	required := []string{
+		"git", "curl", "wget", "tar", "xz", "unzip", "python3",
+		"cc", "gcc", "g++", "make", "pkg-config", "clang", "file", "cmake",
+		"sha256sum", "find", "timeout",
+	}
+	script := "set -eu; for cmd in " + strings.Join(required, " ") + "; do command -v \"$cmd\" >/dev/null || { echo missing:$cmd >&2; exit 1; }; done"
+	check := exec.CommandContext(ctx, "docker", "run", "--rm", "local/aktion-oci-smoke:test", "sh", "-lc", script)
+	check.Stdout = os.Stdout
+	check.Stderr = os.Stderr
+	if err := check.Run(); err != nil {
+		t.Fatalf("default runner command smoke test failed: %v", err)
 	}
 }

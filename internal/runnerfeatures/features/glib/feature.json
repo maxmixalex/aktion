@@ -1,1 +1,0 @@
-{"id":"glib","name":"GLib development","description":"GLib development headers","dependsOn":["build"],"installsAfter":["native"]}

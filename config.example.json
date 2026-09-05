@@ -14,6 +14,7 @@
     "runnerFeatures": {
       "builtin:build": {},
       "builtin:native": {},
+      "builtin:clang": {},
       "ghcr.io/devcontainers/features/common-utils:2": {
         "installZsh": false,
         "configureZshAsDefaultShell": false,
@@ -45,10 +46,6 @@
       "maxRunners": 2,
       "extends": ["defaults"],
       "runnerFeatures": {
-        "builtin:glib": {},
-        "builtin:gtk4": {},
-        "builtin:ncurses": {},
-        "builtin:lua54": {},
         "ghcr.io/devcontainers/features/node:1": {
           "version": "lts"
         },

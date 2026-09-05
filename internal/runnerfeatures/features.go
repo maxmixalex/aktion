@@ -16,13 +16,11 @@ import (
 const RuntimeLabel = "io.aktion.runner-feature-runtime"
 
 var builtinIDs = map[string]bool{
-	"build":   true,
-	"native":  true,
-	"glib":    true,
-	"gtk4":    true,
-	"ncurses": true,
-	"lua54":   true,
-	"svn":     true,
+	"build":  true,
+	"native": true,
+	"clang":  true,
+	"lua54":  true,
+	"svn":    true,
 }
 
 //go:embed features/*/feature.json features/*/install.sh

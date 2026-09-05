@@ -59,14 +59,7 @@ runner 环境仍然**完全由 host 的 `config.json` 决定**。Aktion 不读�
 {
   "id": "hpclang",
   "url": "https://github.com/zyf722/hpclang",
-  "enabled": true,
-  "extends": ["defaults"],
-  "runnerFeatures": {
-    "builtin:glib": {},
-    "builtin:gtk4": {},
-    "builtin:ncurses": {},
-    "builtin:lua54": {}
-  }
+  "enabled": true
 }
 ```
 
@@ -190,9 +183,7 @@ Dev Container lifecycle hooks（`onCreateCommand`、`postCreateCommand` 等）�
 ```text
 builtin:build
 builtin:native
-builtin:glib
-builtin:gtk4
-builtin:ncurses
+builtin:clang
 builtin:lua54
 builtin:svn
 ```
@@ -203,6 +194,9 @@ builtin:svn
 network
 archives
 python
+glib
+gtk4
+ncurses
 ```
 
 已经从仓库中删除，不再自己维护。默认环境改用官方 OCI：
@@ -289,3 +283,16 @@ runs-on: home-docker
 - Metadata: Read（隐含）
 
 无需 webhook。
+
+
+### 默认命令基线
+
+默认 runner 会在专门的 OCI 验证 CI 中实际构建镜像，并逐项检查以下命令：
+
+```text
+git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout
+```
+
+其中 `clang` 是当前 minimal `actions-runner` 容器相对 GitHub-hosted Ubuntu 环境的明确缺口，因此默认环境新增 `builtin:clang`，只安装发行版的 `clang` 包。
+
+`glib/gtk4/ncurses` 不再作为 Aktion builtin；这类项目专用开发库应由 workflow 安装，以便将来切回 GitHub 官方 runner 时行为保持一致。保留的 `builtin:lua54` 和 `builtin:svn` 仍可供其他 host 配置按需使用，但 hpclang 当前不再启用它们。

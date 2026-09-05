@@ -97,6 +97,7 @@ func DefaultSelections() Selections {
 	return Selections{
 		"builtin:build": {},
 		"builtin:native": {},
+		"builtin:clang": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh":               false,
 			"configureZshAsDefaultShell": false,

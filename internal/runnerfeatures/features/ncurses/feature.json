@@ -1,1 +1,0 @@
-{"id":"ncurses","name":"ncurses development","description":"ncurses development headers","dependsOn":["build"],"installsAfter":["native"]}

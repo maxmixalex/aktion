@@ -102,14 +102,7 @@ The simplest repository inheritance remains:
 {
   "id": "hpclang",
   "url": "https://github.com/zyf722/hpclang",
-  "enabled": true,
-  "extends": ["defaults"],
-  "runnerFeatures": {
-    "builtin:glib": {},
-    "builtin:gtk4": {},
-    "builtin:ncurses": {},
-    "builtin:lua54": {}
-  }
+  "enabled": true
 }
 ```
 
@@ -204,13 +197,11 @@ Aktion keeps a small builtin catalog only where the official Dev Container colle
 
 - `builtin:build`
 - `builtin:native`
-- `builtin:glib`
-- `builtin:gtk4`
-- `builtin:ncurses`
+- `builtin:clang`
 - `builtin:lua54`
 - `builtin:svn`
 
-The former builtin `network`, `archives`, and `python` Features were removed. The default environment now uses official `common-utils`, `python`, and `git-lfs` OCI Features instead.
+The former builtin `network`, `archives`, `python`, `glib`, `gtk4`, and `ncurses` Features were removed. Project-specific development libraries should normally be installed by the workflow, matching GitHub-hosted runner expectations. The default environment now uses official `common-utils`, `python`, and `git-lfs` OCI Features instead.
 
 At repository level, omitting `runnerFeatures` inherits the default set. When
 `runnerFeatures` is present without `extends`, it replaces the default set;
@@ -288,3 +279,14 @@ The normal CI workflow uses `runs-on: home-docker`, so Aktion can build Aktion. 
 ## Status
 
 Aktion is early-stage and built on the standalone Runner Scale Set client, which GitHub currently publishes as a preview component. Expect interfaces to evolve.
+
+
+### Default command baseline
+
+The default runner image is continuously smoke-tested for this GitHub-compatible command baseline:
+
+```text
+git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout
+```
+
+`builtin:clang` exists because the minimal `actions-runner` container does not provide Clang by itself, while GitHub-hosted Ubuntu runners do. The dedicated OCI verification workflow builds the effective default runner image and checks every command above with `command -v`.
