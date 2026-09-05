@@ -12,11 +12,13 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/google/uuid"
+	"github.com/zyf722/aktion/internal/runnerfeatures"
 )
 
 type Scaler struct {
 	runners        runnerState
 	runnerImage    string
+	runnerRuntime  runnerfeatures.RuntimeConfig
 	scaleSetID     int
 	dockerClient   *dockerclient.Client
 	scalesetClient *scaleset.Client
@@ -118,16 +120,21 @@ func (a *Scaler) startRunner(ctx context.Context) (string, error) {
 	env := []string{fmt.Sprintf("ACTIONS_RUNNER_INPUT_JITCONFIG=%s", jit.EncodedJITConfig)}
 	env = append(env, runnerProxyEnv()...)
 
+	containerConfig := runnerFeatureRuntimeContainerConfig(a.runnerRuntime, &container.Config{
+		Image:  a.runnerImage,
+		User:   "runner",
+		Cmd:    []string{"/home/runner/run.sh"},
+		Env:    env,
+		Labels: runnerLabels(),
+	})
+	hostConfig, err := runnerFeatureRuntimeHostConfig(a.runnerRuntime, os.Getenv("AKTION_REPOSITORY"), a.runnerImage)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply runner feature runtime metadata: %w", err)
+	}
 	c, err := a.dockerClient.ContainerCreate(
 		ctx,
-		&container.Config{
-			Image:  a.runnerImage,
-			User:   "runner",
-			Cmd:    []string{"/home/runner/run.sh"},
-			Env:    env,
-			Labels: runnerLabels(),
-		},
-		&container.HostConfig{ExtraHosts: []string{"host.docker.internal:host-gateway"}},
+		containerConfig,
+		hostConfig,
 		nil, nil,
 		name,
 	)
