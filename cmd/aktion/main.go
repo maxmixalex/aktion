@@ -547,11 +547,11 @@ func cmdFeatures() int {
 		rows = append(rows, []tableCell{
 			accentCell(id),
 			mutedCell(def),
-			plainCell(f.Manifest.Description),
+			cell(f.Manifest.Description),
 			mutedCell(deps),
 		})
 	}
-	fmt.Println(ui.section("Runner features"))
+	ui.section("Runner features")
 	fmt.Println(ui.table([]string{"ID", "DEFAULT", "DESCRIPTION", "DEPENDS ON"}, rows))
 	fmt.Println()
 	fmt.Println(ui.renderStyle("muted", `Omit defaults.runnerFeatures to use the default feature set; use [] for the unmodified base runner image.`))
