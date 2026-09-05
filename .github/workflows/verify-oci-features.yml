@@ -28,3 +28,9 @@ jobs:
         run: go test ./...
       - name: Vet
         run: go vet ./...
+
+      - name: Resolve and build official OCI Features
+        env:
+          AKTION_TEST_OCI: '1'
+          AKTION_TEST_DOCKER: '1'
+        run: go test ./internal/runnerfeatures -run TestOfficialOCIDefaults -v -count=1
