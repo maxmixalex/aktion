@@ -70,9 +70,6 @@ func TestHyperlinkModes(t *testing.T) {
 	if !strings.Contains(got, "\x1b]8;;https://github.com/example/repo\x1b\\") {
 		t.Fatalf("always mode missing OSC 8 hyperlink: %q", got)
 	}
-	if visibleWidth("repo") != visibleWidth("repo") {
-		t.Fatal("sanity")
-	}
 
 	u, err = newUI("never", "never")
 	if err != nil {

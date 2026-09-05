@@ -2,7 +2,6 @@ package runnerfeatures
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -23,9 +22,6 @@ func (s *Selections) UnmarshalJSON(data []byte) error {
 	if trimmed == "null" {
 		*s = nil
 		return nil
-	}
-	if strings.HasPrefix(trimmed, "[") {
-		return fmt.Errorf("runnerFeatures now uses an object keyed by Feature URI, not the legacy string array")
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -96,7 +92,6 @@ func CloneSelections(in Selections) Selections {
 func DefaultSelections() Selections {
 	return Selections{
 		"builtin:build": {},
-		"builtin:native": {},
 		"builtin:clang": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh":               false,
@@ -156,7 +151,7 @@ func NormalizeReference(ref string) (string, error) {
 		if id == "" || strings.ContainsAny(id, "/:@") {
 			return "", fmt.Errorf("invalid builtin feature reference %q", ref)
 		}
-		if _, ok := builtinIDs[id]; !ok {
+		if _, ok := builtinDefinitions[id]; !ok {
 			return "", fmt.Errorf("unknown builtin feature %q", id)
 		}
 		return "builtin:" + id, nil
@@ -192,10 +187,7 @@ func ImageName(baseImage string, selections Selections) (string, string, error) 
 	if err != nil {
 		return "", "", err
 	}
-	h := sha256.New()
-	_, _ = h.Write([]byte(baseImage))
-	_, _ = h.Write([]byte{0})
-	_, _ = h.Write(payload)
-	tag := "local/aktion-runner:" + hex.EncodeToString(h.Sum(nil))[:16]
+	sum := sha256.Sum256(append(append([]byte(baseImage), 0), payload...))
+	tag := fmt.Sprintf("local/aktion-runner:%x", sum[:8])
 	return tag, baseImage, nil
 }

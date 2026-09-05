@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"net/url"
 	"os"
 	"strings"
@@ -16,18 +17,12 @@ type Config struct {
 	MinRunners      int
 	ScaleSetName    string
 	Labels          []string
-	RunnerGroup     string
 	GitHubApp       scaleset.GitHubAppAuth
-	Token           string
 	RunnerImage     string
 	LogLevel        string
-	LogFormat       string
 }
 
 func (c *Config) defaults() {
-	if c.RunnerGroup == "" {
-		c.RunnerGroup = scaleset.DefaultRunnerGroup
-	}
 	if c.RunnerImage == "" {
 		c.RunnerImage = "ghcr.io/actions/actions-runner:latest"
 	}
@@ -38,9 +33,8 @@ func (c *Config) Validate() error {
 	if _, err := url.ParseRequestURI(c.RegistrationURL); err != nil {
 		return fmt.Errorf("invalid registration URL: %w, it should be the full URL of where you want to register your scale set, e.g. 'https://github.com/org/repo'", err)
 	}
-	appError := c.GitHubApp.Validate()
-	if c.Token == "" && appError != nil {
-		return fmt.Errorf("no credentials provided: either GitHub App (client id, installation id and private key) (recommended) or a Personal Access Token are required")
+	if err := c.GitHubApp.Validate(); err != nil {
+		return fmt.Errorf("invalid GitHub App credentials: %w", err)
 	}
 	if c.ScaleSetName == "" {
 		return fmt.Errorf("scale set name is required")
@@ -50,16 +44,20 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("label at index %d is empty", i)
 		}
 	}
-	if c.MaxRunners < c.MinRunners {
-		return fmt.Errorf("max runners cannot be less than min-runners")
+	if c.MinRunners < 0 || c.MaxRunners < 0 {
+		return fmt.Errorf("min runners and max runners cannot be negative")
 	}
-	if c.RunnerGroup == "" {
-		return fmt.Errorf("runner group is required")
-	}
-	if c.RunnerImage == "" {
-		return fmt.Errorf("runner image is required")
+	if c.MaxRunners > 0 && c.MaxRunners < c.MinRunners {
+		return fmt.Errorf("max runners cannot be less than min runners")
 	}
 	return nil
+}
+
+func (c Config) maxCapacity() int {
+	if c.MaxRunners == 0 {
+		return math.MaxInt32
+	}
+	return c.MaxRunners
 }
 
 func systemInfo(scaleSetID int) scaleset.SystemInfo {
@@ -67,10 +65,11 @@ func systemInfo(scaleSetID int) scaleset.SystemInfo {
 }
 
 func (c *Config) ScalesetClient() (*scaleset.Client, error) {
-	if err := c.GitHubApp.Validate(); err == nil {
-		return scaleset.NewClientWithGitHubApp(scaleset.ClientWithGitHubAppConfig{GitHubConfigURL: c.RegistrationURL, GitHubAppAuth: c.GitHubApp, SystemInfo: systemInfo(0)})
-	}
-	return scaleset.NewClientWithPersonalAccessToken(scaleset.NewClientWithPersonalAccessTokenConfig{GitHubConfigURL: c.RegistrationURL, PersonalAccessToken: c.Token, SystemInfo: systemInfo(0)})
+	return scaleset.NewClientWithGitHubApp(scaleset.ClientWithGitHubAppConfig{
+		GitHubConfigURL: c.RegistrationURL,
+		GitHubAppAuth:   c.GitHubApp,
+		SystemInfo:      systemInfo(0),
+	})
 }
 
 func (c *Config) Logger() *slog.Logger {
@@ -85,14 +84,7 @@ func (c *Config) Logger() *slog.Logger {
 	default:
 		lvl = slog.LevelInfo
 	}
-	switch c.LogFormat {
-	case "json":
-		return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: lvl}))
-	case "text":
-		return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true, Level: lvl}))
-	default:
-		return slog.New(slog.DiscardHandler)
-	}
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
 }
 
 func (c *Config) BuildLabels() []scaleset.Label {

@@ -334,7 +334,6 @@ func linkedCell(text, style, target string) tableCell {
 }
 func goodCell(text string) tableCell                 { return styledCell(text, "good") }
 func badCell(text string) tableCell                  { return styledCell(text, "bad") }
-func warnCell(text string) tableCell                 { return styledCell(text, "warn") }
 func mutedCell(text string) tableCell                { return styledCell(text, "muted") }
 func accentCell(text string) tableCell               { return styledCell(text, "accent") }
 func infoCell(text string) tableCell                 { return styledCell(text, "info") }

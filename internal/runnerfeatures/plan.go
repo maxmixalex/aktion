@@ -2,8 +2,8 @@ package runnerfeatures
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"reflect"
 	"os"
 	"path/filepath"
 	"sort"
@@ -79,19 +79,13 @@ func (r *Resolver) ResolvePlan(ctx context.Context, baseImage string, selections
 			Reference: normalizedRef,
 			Identity:  pkg.Identity,
 			Canonical: pkg.Canonical,
-			Digest:    pkg.ManifestDigest,
 			Manifest:  pkg.Manifest,
 			Options:   resolvedOptions,
 			Files:     pkg.Files,
-			Builtin:   strings.HasPrefix(normalizedRef, "builtin:"),
 		}
 
 		if existing, ok := nodes[feature.Identity]; ok {
-			sameOptions, err := optionsEqual(existing.feature.Options, feature.Options)
-			if err != nil {
-				return "", err
-			}
-			if existing.feature.Canonical != feature.Canonical || !sameOptions {
+			if existing.feature.Canonical != feature.Canonical || !reflect.DeepEqual(existing.feature.Options, feature.Options) {
 				return "", fmt.Errorf(
 					"feature %s was requested more than once with incompatible version/options (%s vs %s)",
 					feature.Identity,
@@ -255,18 +249,6 @@ func contains(values []string, target string) bool {
 		}
 	}
 	return false
-}
-
-func optionsEqual(a, b Options) (bool, error) {
-	aj, err := json.Marshal(a)
-	if err != nil {
-		return false, err
-	}
-	bj, err := json.Marshal(b)
-	if err != nil {
-		return false, err
-	}
-	return string(aj) == string(bj), nil
 }
 
 func mergeRuntime(features []ResolvedFeature) (RuntimeConfig, []string) {

@@ -1,0 +1,26 @@
+site_name: Aktion
+site_description: 不用 Kubernetes 的自托管 GitHub Actions
+site_url: https://zyf722.github.io/aktion/
+repo_url: https://github.com/zyf722/aktion
+repo_name: zyf722/aktion
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - 首页: index.md
+  - 安装与启动: getting-started.md
+  - 配置: configuration.md
+  - Runner 环境: runner-environment.md
+  - 日常操作: operations.md
+  - CLI: cli.md
+  - 故障排查: troubleshooting.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences

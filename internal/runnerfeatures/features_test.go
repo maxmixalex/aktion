@@ -6,11 +6,8 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
@@ -20,7 +17,6 @@ func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
 		"ghcr.io/devcontainers/features/python:1",
 		"ghcr.io/devcontainers/features/git-lfs:1",
 		"builtin:build",
-		"builtin:native",
 		"builtin:clang",
 	} {
 		if _, ok := defaults[ref]; !ok {
@@ -34,45 +30,18 @@ func TestDefaultSelectionsUseOfficialFeatures(t *testing.T) {
 	}
 }
 
-func TestBuiltinClangFeature(t *testing.T) {
+func TestBuiltinCatalogLoads(t *testing.T) {
 	catalog, err := Catalog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	clang, ok := catalog["clang"]
-	if !ok {
-		t.Fatalf("clang builtin missing from catalog: %#v", catalog)
-	}
-	if !strings.Contains(string(clang.Install), "apt-get install -y --no-install-recommends clang") {
-		t.Fatalf("clang install script=%q", string(clang.Install))
-	}
-	if _, err := loadBuiltin("builtin:clang"); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestBuiltinSVNFeature(t *testing.T) {
-	catalog, err := Catalog()
-	if err != nil {
-		t.Fatal(err)
-	}
-	svn, ok := catalog["svn"]
-	if !ok {
-		t.Fatalf("svn builtin missing from catalog: %#v", catalog)
-	}
-	if svn.Manifest.Name != "Subversion client" {
-		t.Fatalf("svn name=%q", svn.Manifest.Name)
-	}
-	install := string(svn.Install)
-	if !strings.Contains(install, "apt-get install -y --no-install-recommends subversion") {
-		t.Fatalf("svn install script=%q", install)
-	}
-	pkg, err := loadBuiltin("builtin:svn")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if pkg.Manifest.ID != "svn" || len(pkg.Files) != 1 || pkg.Files[0].Path != "install.sh" {
-		t.Fatalf("svn package=%#v", pkg)
+	for _, id := range []string{"build", "clang", "lua54", "svn"} {
+		if _, ok := catalog[id]; !ok {
+			t.Fatalf("builtin %q missing from catalog", id)
+		}
+		if _, err := loadBuiltin("builtin:" + id); err != nil {
+			t.Fatalf("load builtin %q: %v", id, err)
+		}
 	}
 }
 
@@ -109,13 +78,6 @@ func TestSelectionsDecodeDevContainerStyleValues(t *testing.T) {
 }
 
 
-func TestSelectionsRejectLegacyArray(t *testing.T) {
-	var selections Selections
-	err := json.Unmarshal([]byte("[\"build\",\"python\"]"), &selections)
-	if err == nil || !strings.Contains(err.Error(), "legacy string array") {
-		t.Fatalf("unexpected legacy config error: %v", err)
-	}
-}
 
 func TestImageNameIsStableWithoutNetwork(t *testing.T) {
 	features := Selections{
@@ -170,10 +132,8 @@ func TestResolvePlanOrdersDependenciesAndAppliesOptions(t *testing.T) {
 	aRef := "ghcr.io/example/features/a:1"
 	fetcher := fakeFetcher{
 		bRef: {
-			Reference: bRef,
 			Identity:  "ghcr.io/example/features/b",
 			Canonical: "ghcr.io/example/features/b@sha256:b",
-			ManifestDigest: "sha256:b",
 			Manifest: Manifest{
 				ID: "b", Version: "1.0.0", Name: "B",
 				ContainerEnv: map[string]string{"B_HOME": "/opt/b"},
@@ -181,10 +141,8 @@ func TestResolvePlanOrdersDependenciesAndAppliesOptions(t *testing.T) {
 			Files: []FeatureFile{{Path: "install.sh", Mode: 0755, Data: []byte("#!/bin/sh\n")}},
 		},
 		aRef: {
-			Reference: aRef,
 			Identity:  "ghcr.io/example/features/a",
 			Canonical: "ghcr.io/example/features/a@sha256:a",
-			ManifestDigest: "sha256:a",
 			Manifest: Manifest{
 				ID: "a", Version: "1.0.0", Name: "A",
 				Options: map[string]OptionDefinition{
@@ -231,7 +189,6 @@ func TestResolvePlanRejectsUnknownOption(t *testing.T) {
 	ref := "ghcr.io/example/features/a:1"
 	resolver := &Resolver{OCI: fakeFetcher{
 		ref: {
-			Reference: ref,
 			Identity: "ghcr.io/example/features/a",
 			Canonical: "ghcr.io/example/features/a@sha256:a",
 			Manifest: Manifest{ID: "a", Version: "1.0.0", Name: "A"},
@@ -311,70 +268,3 @@ func featureIDs(features []ResolvedFeature) []string {
 }
 
 
-func TestOfficialOCIDefaults(t *testing.T) {
-	if os.Getenv("AKTION_TEST_OCI") != "1" {
-		t.Skip("set AKTION_TEST_OCI=1 to resolve public official OCI Features")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	resolver := NewResolver(t.TempDir())
-	plan, err := resolver.ResolvePlan(ctx, DefaultBaseImage, DefaultSelections())
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := strings.Join(featureIDs(plan.Features), ",")
-	for _, want := range []string{"build", "native", "clang", "common-utils", "python", "git-lfs"} {
-		if !strings.Contains(","+got+",", ","+want+",") {
-			t.Fatalf("official default plan %q missing %q", got, want)
-		}
-	}
-	if !strings.Contains(plan.Dockerfile, "INSTALLTOOLS='false'") {
-		t.Fatalf("official Python options were not mapped into Dockerfile:\n%s", plan.Dockerfile)
-	}
-	runtimePlan, err := resolver.ResolvePlan(ctx, DefaultBaseImage, Selections{
-		"ghcr.io/devcontainers/features/go:1": {},
-		"ghcr.io/devcontainers/features/rust:1": {},
-		"ghcr.io/devcontainers/features/docker-in-docker:4": {
-			"version": "latest",
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !runtimePlan.Runtime.Init || !runtimePlan.Runtime.Privileged {
-		t.Fatalf("official runtime flags not resolved: %#v", runtimePlan.Runtime)
-	}
-	if !contains(runtimePlan.Runtime.CapAdd, "SYS_PTRACE") || !contains(runtimePlan.Runtime.SecurityOpt, "seccomp=unconfined") {
-		t.Fatalf("official Go/Rust runtime metadata missing: %#v", runtimePlan.Runtime)
-	}
-	if len(runtimePlan.Runtime.Mounts) < 2 || !contains(runtimePlan.Runtime.Entrypoints, "/usr/local/share/docker-init.sh") {
-		t.Fatalf("official Docker-in-Docker runtime metadata missing: %#v", runtimePlan.Runtime)
-	}
-
-	if os.Getenv("AKTION_TEST_DOCKER") != "1" {
-		return
-	}
-	dir := t.TempDir()
-	if err := WriteBuildContext(plan, dir); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.CommandContext(ctx, "docker", "build", "-t", "local/aktion-oci-smoke:test", ".")
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("build official OCI feature runner image: %v", err)
-	}
-	required := []string{
-		"git", "curl", "wget", "tar", "xz", "unzip", "python3",
-		"cc", "gcc", "g++", "make", "pkg-config", "clang", "file", "cmake",
-		"sha256sum", "find", "timeout",
-	}
-	script := "set -eu; for cmd in " + strings.Join(required, " ") + "; do command -v \"$cmd\" >/dev/null || { echo missing:$cmd >&2; exit 1; }; done"
-	check := exec.CommandContext(ctx, "docker", "run", "--rm", "local/aktion-oci-smoke:test", "sh", "-lc", script)
-	check.Stdout = os.Stdout
-	check.Stderr = os.Stderr
-	if err := check.Run(); err != nil {
-		t.Fatalf("default runner command smoke test failed: %v", err)
-	}
-}

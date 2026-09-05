@@ -1,11 +1,9 @@
 package runnerpreset
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/zyf722/aktion/internal/ociregistry"
@@ -18,37 +16,6 @@ const (
 	LayerMediaType = "application/vnd.aktion.runner-preset.v1+json"
 )
 
-type Extends []string
-
-func (e *Extends) UnmarshalJSON(data []byte) error {
-	data = bytes.TrimSpace(data)
-	if bytes.Equal(data, []byte("null")) || len(data) == 0 {
-		*e = nil
-		return nil
-	}
-	var one string
-	if err := json.Unmarshal(data, &one); err == nil {
-		one = strings.TrimSpace(one)
-		if one == "" {
-			return fmt.Errorf("extends cannot contain an empty reference")
-		}
-		*e = Extends{one}
-		return nil
-	}
-	var many []string
-	if err := json.Unmarshal(data, &many); err != nil {
-		return fmt.Errorf("extends must be a string or array of strings")
-	}
-	for i := range many {
-		many[i] = strings.TrimSpace(many[i])
-		if many[i] == "" {
-			return fmt.Errorf("extends[%d] cannot be empty", i)
-		}
-	}
-	*e = Extends(many)
-	return nil
-}
-
 type Preset struct {
 	Version        int                       `json:"version"`
 	RunnerImage    string                    `json:"runnerImage,omitempty"`
@@ -56,8 +23,6 @@ type Preset struct {
 }
 
 type Resolved struct {
-	Reference      string
-	Canonical      string
 	RunnerImage    string
 	RunnerFeatures runnerfeatures.Selections
 }
@@ -71,9 +36,6 @@ func NewSource(cacheDir string) *Source {
 }
 
 func (s *Source) Fetch(ctx context.Context, input string) (Resolved, error) {
-	if s == nil || s.Registry == nil {
-		return Resolved{}, fmt.Errorf("OCI runner preset resolver is unavailable")
-	}
 	artifact, err := s.Registry.FetchManifest(ctx, input, ociregistry.ManifestAccept)
 	if err != nil {
 		return Resolved{}, err
@@ -98,20 +60,8 @@ func (s *Source) Fetch(ctx context.Context, input string) (Resolved, error) {
 	if err != nil {
 		return Resolved{}, err
 	}
-	if len(data) > 1<<20 {
-		return Resolved{}, fmt.Errorf("%s runner preset exceeds 1 MiB", artifact.Reference.String())
-	}
 	var preset Preset
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&preset); err != nil {
-		return Resolved{}, fmt.Errorf("parse runner preset %s: %w", artifact.Reference.String(), err)
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return Resolved{}, fmt.Errorf("runner preset %s must contain exactly one JSON document", artifact.Reference.String())
-		}
+	if err := json.Unmarshal(data, &preset); err != nil {
 		return Resolved{}, fmt.Errorf("parse runner preset %s: %w", artifact.Reference.String(), err)
 	}
 	if preset.Version != Version {
@@ -122,8 +72,6 @@ func (s *Source) Fetch(ctx context.Context, input string) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("runner preset %s runnerFeatures: %w", artifact.Reference.String(), err)
 	}
 	return Resolved{
-		Reference:      artifact.Reference.String(),
-		Canonical:      artifact.Reference.Identity() + "@" + artifact.ManifestDigest,
 		RunnerImage:    strings.TrimSpace(preset.RunnerImage),
 		RunnerFeatures: features,
 	}, nil

@@ -1,13 +1,10 @@
 package runnerfeatures
 
 import (
-	"crypto/sha256"
 	"embed"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"sort"
 	"strings"
@@ -15,30 +12,33 @@ import (
 
 const RuntimeLabel = "io.aktion.runner-feature-runtime"
 
-var builtinIDs = map[string]bool{
-	"build":  true,
-	"native": true,
-	"clang":  true,
-	"lua54":  true,
-	"svn":    true,
+type builtinDefinition struct {
+	Name          string
+	Description   string
+	DependsOn     []string
+	InstallsAfter []string
 }
 
-//go:embed features/*/feature.json features/*/install.sh
+var builtinDefinitions = map[string]builtinDefinition{
+	"build":  {Name: "Build toolchain", Description: "Common C/C++ build toolchain"},
+	"clang":  {Name: "Clang compiler", Description: "Clang C/C++ compiler from the distribution package", DependsOn: []string{"build"}},
+	"lua54":  {Name: "Lua 5.4 development", Description: "Lua 5.4 development headers", DependsOn: []string{"build"}},
+	"svn":    {Name: "Subversion client", Description: "Apache Subversion command-line client"},
+}
+
+//go:embed features/*/install.sh
 var builtinFiles embed.FS
 
 type OptionDefinition struct {
 	Type        string
 	Enum        []string
-	Proposals   []string
 	Default     any
-	Description string
 }
 
 type Mount struct {
 	Type     string
 	Source   string
 	Target   string
-	External bool
 }
 
 type Manifest struct {
@@ -46,8 +46,6 @@ type Manifest struct {
 	Version          string
 	Name             string
 	Description      string
-	DocumentationURL string
-	LicenseURL       string
 	Options          map[string]OptionDefinition
 	ContainerEnv     map[string]string
 	Privileged       bool
@@ -74,23 +72,19 @@ type FeatureFile struct {
 }
 
 type FeaturePackage struct {
-	Reference      string
-	Identity       string
-	Canonical      string
-	ManifestDigest string
-	Manifest       Manifest
-	Files          []FeatureFile
+	Identity  string
+	Canonical string
+	Manifest  Manifest
+	Files     []FeatureFile
 }
 
 type ResolvedFeature struct {
 	Reference string
 	Identity  string
 	Canonical string
-	Digest    string
 	Manifest  Manifest
 	Options   Options
 	Files     []FeatureFile
-	Builtin   bool
 }
 
 type RuntimeMount struct {
@@ -131,66 +125,42 @@ func DecodeRuntime(encoded string) (RuntimeConfig, error) {
 	return runtime, nil
 }
 
-type builtinManifest struct {
-	ID            string
-	Name          string
-	Description   string
-	DependsOn     []string
-	InstallsAfter []string
-}
-
 type BuiltinFeature struct {
 	Manifest Manifest
 	Install  []byte
-	Digest   string
 }
 
 func Catalog() (map[string]BuiltinFeature, error) {
-	out := make(map[string]BuiltinFeature, len(builtinIDs))
-	ids := make([]string, 0, len(builtinIDs))
-	for id := range builtinIDs {
+	out := make(map[string]BuiltinFeature, len(builtinDefinitions))
+	ids := make([]string, 0, len(builtinDefinitions))
+	for id := range builtinDefinitions {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
 	for _, id := range ids {
-		meta, err := fs.ReadFile(builtinFiles, "features/"+id+"/feature.json")
+		definition := builtinDefinitions[id]
+		install, err := builtinFiles.ReadFile("features/" + id + "/install.sh")
 		if err != nil {
 			return nil, err
-		}
-		install, err := fs.ReadFile(builtinFiles, "features/"+id+"/install.sh")
-		if err != nil {
-			return nil, err
-		}
-		var raw builtinManifest
-		if err := json.Unmarshal(meta, &raw); err != nil {
-			return nil, fmt.Errorf("builtin feature %s: %w", id, err)
-		}
-		if raw.ID != id || raw.ID == "" {
-			return nil, fmt.Errorf("builtin feature directory %q has id %q", id, raw.ID)
 		}
 		depends := map[string]json.RawMessage{}
-		for _, dep := range raw.DependsOn {
+		for _, dep := range definition.DependsOn {
 			depends["builtin:"+dep] = json.RawMessage("{}")
 		}
-		installsAfter := make([]string, 0, len(raw.InstallsAfter))
-		for _, dep := range raw.InstallsAfter {
+		installsAfter := make([]string, 0, len(definition.InstallsAfter))
+		for _, dep := range definition.InstallsAfter {
 			installsAfter = append(installsAfter, "builtin:"+dep)
 		}
-		h := sha256.New()
-		_, _ = h.Write(meta)
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write(install)
 		out[id] = BuiltinFeature{
 			Manifest: Manifest{
 				ID:            id,
 				Version:       "builtin",
-				Name:          raw.Name,
-				Description:   raw.Description,
+				Name:          definition.Name,
+				Description:   definition.Description,
 				DependsOn:     depends,
 				InstallsAfter: installsAfter,
 			},
 			Install: install,
-			Digest:  hex.EncodeToString(h.Sum(nil)),
 		}
 	}
 	return out, nil
@@ -211,14 +181,12 @@ func loadBuiltin(ref string) (FeaturePackage, error) {
 		return FeaturePackage{}, fmt.Errorf("unknown builtin feature %q", id)
 	}
 	return FeaturePackage{
-		Reference: normalized,
 		Identity:  normalized,
-		Canonical: normalized + "@" + feature.Digest,
+		Canonical: normalized,
 		Manifest:  feature.Manifest,
 		Files: []FeatureFile{
 			{Path: "install.sh", Mode: 0755, Data: feature.Install},
 		},
-		ManifestDigest: feature.Digest,
 	}, nil
 }
 

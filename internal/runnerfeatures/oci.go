@@ -96,10 +96,8 @@ func (c *OCIClient) FetchFeature(ctx context.Context, input string) (FeaturePack
 	}
 
 	return FeaturePackage{
-		Reference:      ref.String(),
 		Identity:       ref.Identity(),
 		Canonical:      ref.Identity() + "@" + artifact.ManifestDigest,
-		ManifestDigest: artifact.ManifestDigest,
 		Manifest:       metadata,
 		Files:          files,
 	}, nil

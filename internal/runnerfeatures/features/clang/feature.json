@@ -1,1 +1,0 @@
-{"id":"clang","name":"Clang compiler","description":"Clang C/C++ compiler from the distribution package","dependsOn":["build"],"installsAfter":[]}

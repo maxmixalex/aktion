@@ -115,7 +115,6 @@ type Artifact struct {
 	Reference      Reference
 	Manifest       Manifest
 	ManifestDigest string
-	Headers        http.Header
 }
 
 type Client struct {
@@ -176,7 +175,6 @@ func (c *Client) FetchManifest(ctx context.Context, input, accept string) (Artif
 		Reference:      ref,
 		Manifest:       manifest,
 		ManifestDigest: digest,
-		Headers:        headers,
 	}, nil
 }
 

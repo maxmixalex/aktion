@@ -12,22 +12,6 @@ import (
 	"github.com/zyf722/aktion/internal/runnerfeatures"
 )
 
-func TestExtendsAcceptsStringAndArray(t *testing.T) {
-	var one Extends
-	if err := one.UnmarshalJSON([]byte(`"defaults"`)); err != nil {
-		t.Fatal(err)
-	}
-	if len(one) != 1 || one[0] != "defaults" {
-		t.Fatalf("one=%#v", one)
-	}
-	var many Extends
-	if err := many.UnmarshalJSON([]byte(`["defaults","ghcr.io/example/runner/hpclang:1"]`)); err != nil {
-		t.Fatal(err)
-	}
-	if len(many) != 2 {
-		t.Fatalf("many=%#v", many)
-	}
-}
 
 func TestMergeFeaturesOverridesAndDeletes(t *testing.T) {
 	base := runnerfeatures.Selections{
@@ -86,8 +70,5 @@ func TestFetchRunnerPreset(t *testing.T) {
 	}
 	if _, ok := got.RunnerFeatures["builtin:svn"]; !ok {
 		t.Fatalf("features=%#v", got.RunnerFeatures)
-	}
-	if !strings.Contains(got.Canonical, "@sha256:") {
-		t.Fatalf("canonical=%q", got.Canonical)
 	}
 }

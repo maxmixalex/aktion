@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/actions/scaleset"
 	"github.com/actions/scaleset/listener"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/google/uuid"
@@ -18,18 +17,15 @@ import (
 func init() {
 	flags := cmd.Flags()
 	flags.StringVar(&cfg.RegistrationURL, "url", "", "REQUIRED: URL where to register your scale set (e.g. https://github.com/org/repo)")
-	flags.IntVar(&cfg.MaxRunners, "max-runners", 10, "Maximum number of runners")
+	flags.IntVar(&cfg.MaxRunners, "max-runners", 10, "Maximum number of runners (0 = unlimited)")
 	flags.IntVar(&cfg.MinRunners, "min-runners", 0, "Minimum number of runners")
 	flags.StringVar(&cfg.ScaleSetName, "name", "", "REQUIRED: Name of your scale set")
 	flags.StringSliceVar(&cfg.Labels, "labels", nil, "Labels for workflow targeting (comma-separated or repeated). Defaults to --name if not provided.")
-	flags.StringVar(&cfg.RunnerGroup, "runner-group", scaleset.DefaultRunnerGroup, "Name of the runner group your scale set should belong to")
 	flags.StringVar(&cfg.RunnerImage, "runner-image", "ghcr.io/actions/actions-runner:latest", "Linux runner container image")
 	flags.StringVar(&cfg.GitHubApp.ClientID, "app-client-id", "", "GitHub App client id")
 	flags.Int64Var(&cfg.GitHubApp.InstallationID, "app-installation-id", 0, "GitHub App installation ID")
 	flags.StringVar(&cfg.GitHubApp.PrivateKey, "app-private-key", "", "GitHub App private key")
-	flags.StringVar(&cfg.Token, "token", "", "Personal access token (can be used in place of a GitHub App, although not recommended)")
 	flags.StringVar(&cfg.LogLevel, "log-level", "info", "Logging level (debug, info, warn, error)")
-	flags.StringVar(&cfg.LogFormat, "log-format", "text", "Logging format (text, json). If invalid value is provided, defaults to no logs.")
 	_ = cmd.MarkFlagRequired("url")
 	_ = cmd.MarkFlagRequired("name")
 }
@@ -50,18 +46,7 @@ func runListener(ctx context.Context, c Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create scaleset client: %w", err)
 	}
-	var runnerGroupID int
-	switch c.RunnerGroup {
-	case scaleset.DefaultRunnerGroup:
-		runnerGroupID = 1
-	default:
-		runnerGroup, err := scalesetClient.GetRunnerGroupByName(ctx, c.RunnerGroup)
-		if err != nil {
-			return fmt.Errorf("failed to get runner group ID: %w", err)
-		}
-		runnerGroupID = runnerGroup.ID
-	}
-	scaleSet, reused, err := getOrCreateRunnerScaleSet(ctx, scalesetClient, runnerGroupID, c.ScaleSetName, c.BuildLabels())
+	scaleSet, reused, err := getOrCreateRunnerScaleSet(ctx, scalesetClient, c.ScaleSetName, c.BuildLabels())
 	if err != nil {
 		return err
 	}
@@ -90,21 +75,17 @@ func runListener(ctx context.Context, c Config) error {
 		return err
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = uuid.NewString()
-		logger.Info("Failed to get hostname, fallback to uuid", "uuid", hostname, "error", err)
-	}
-	sessionClient, err := scalesetClient.MessageSessionClient(ctx, scaleSet.ID, hostname)
+	sessionClient, err := scalesetClient.MessageSessionClient(ctx, scaleSet.ID, uuid.NewString())
 	if err != nil {
 		return fmt.Errorf("failed to create message session client: %w", err)
 	}
 	defer sessionClient.Close(context.Background())
 
+	maxCapacity := c.maxCapacity()
 	logger.Info("Initializing listener")
 	l, err := listener.New(sessionClient, listener.Config{
 		ScaleSetID: scaleSet.ID,
-		MaxRunners: c.MaxRunners,
+		MaxRunners: maxCapacity,
 		Logger: logger.WithGroup("listener"),
 	})
 	if err != nil {
@@ -116,7 +97,7 @@ func runListener(ctx context.Context, c Config) error {
 		runnerImage: c.RunnerImage,
 		runnerRuntime: runnerRuntime,
 		minRunners: c.MinRunners,
-		maxRunners: c.MaxRunners,
+		maxRunners: maxCapacity,
 		dockerClient: dockerClient,
 		scalesetClient: scalesetClient,
 		scaleSetID: scaleSet.ID,
@@ -139,9 +120,6 @@ var cmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
 		defer cancel()
-		if err := cfg.Validate(); err != nil {
-			return fmt.Errorf("invalid configuration: %w", err)
-		}
 		return runListener(ctx, cfg)
 	},
 }

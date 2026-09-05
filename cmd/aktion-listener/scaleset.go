@@ -12,14 +12,15 @@ type runnerScaleSetClient interface {
 	CreateRunnerScaleSet(context.Context, *scaleset.RunnerScaleSet) (*scaleset.RunnerScaleSet, error)
 }
 
+const defaultRunnerGroupID = 1
+
 func getOrCreateRunnerScaleSet(
 	ctx context.Context,
 	client runnerScaleSetClient,
-	runnerGroupID int,
 	name string,
 	labels []scaleset.Label,
 ) (*scaleset.RunnerScaleSet, bool, error) {
-	existing, err := client.GetRunnerScaleSet(ctx, runnerGroupID, name)
+	existing, err := client.GetRunnerScaleSet(ctx, defaultRunnerGroupID, name)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get runner scale set: %w", err)
 	}
@@ -29,7 +30,7 @@ func getOrCreateRunnerScaleSet(
 
 	created, err := client.CreateRunnerScaleSet(ctx, &scaleset.RunnerScaleSet{
 		Name:          name,
-		RunnerGroupID: runnerGroupID,
+		RunnerGroupID: defaultRunnerGroupID,
 		Labels:        labels,
 		RunnerSetting: scaleset.RunnerSetting{DisableUpdate: true},
 	})

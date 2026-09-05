@@ -41,7 +41,6 @@ func TestGetOrCreateRunnerScaleSetReusesExisting(t *testing.T) {
 	got, reused, err := getOrCreateRunnerScaleSet(
 		context.Background(),
 		client,
-		1,
 		"home-docker",
 		[]scaleset.Label{{Name: "home-docker"}},
 	)
@@ -65,7 +64,6 @@ func TestGetOrCreateRunnerScaleSetCreatesWhenMissing(t *testing.T) {
 	got, reused, err := getOrCreateRunnerScaleSet(
 		context.Background(),
 		client,
-		1,
 		"home-docker",
 		[]scaleset.Label{{Name: "home-docker"}},
 	)

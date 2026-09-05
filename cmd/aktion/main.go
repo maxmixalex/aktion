@@ -55,7 +55,7 @@ type AppConfig struct {
 }
 
 type Defaults struct {
-	Extends        runnerpreset.Extends      `json:"extends,omitempty"`
+	Extends        []string      `json:"extends,omitempty"`
 	ScaleSetName   string                    `json:"scaleSetName"`
 	MinRunners     *int                      `json:"minRunners"`
 	MaxRunners     *int                      `json:"maxRunners"`
@@ -69,7 +69,7 @@ type Repository struct {
 	ID             string                    `json:"id"`
 	URL            string                    `json:"url"`
 	Enabled        bool                      `json:"enabled"`
-	Extends        runnerpreset.Extends      `json:"extends,omitempty"`
+	Extends        []string      `json:"extends,omitempty"`
 	InstallationID *int64                    `json:"installationId,omitempty"`
 	ScaleSetName   string                    `json:"scaleSetName,omitempty"`
 	MinRunners     *int                      `json:"minRunners,omitempty"`
@@ -93,43 +93,34 @@ type RepoResolved struct {
 	BaseImage          string
 	Features           []string
 	FeatureSelections  runnerfeatures.Selections
-	ResolvedPresets    []string
 }
 
 type Loaded struct {
 	Root       string
-	ConfigPath string
 	KeyPath    string
 	Config     Config
 	Repos      []RepoResolved
 }
 
 type dockerRow struct {
-	ID         string `json:"ID"`
 	Image      string `json:"Image"`
 	Names      string `json:"Names"`
 	Status     string `json:"Status"`
 	State      string `json:"State"`
-	RunningFor string `json:"RunningFor"`
 	Labels     string `json:"Labels"`
 }
 
 type activeJob struct {
 	Repository  string
-	Runner      string
 	JobID       string
 	JobName     string
 	WorkflowRef string
 	WorkflowRun int64
-	EventName   string
 	StartedAt   time.Time
 }
 
 type repoDemand struct {
 	Assigned int
-	Current  int
-	Target   int
-	SeenAt   time.Time
 }
 
 type dockerStat struct {
@@ -138,8 +129,6 @@ type dockerStat struct {
 	MemUsage string `json:"MemUsage"`
 	MemPerc  string `json:"MemPerc"`
 	NetIO    string `json:"NetIO"`
-	BlockIO  string `json:"BlockIO"`
-	PIDs     string `json:"PIDs"`
 }
 
 type githubAccessToken struct {
@@ -158,7 +147,6 @@ type actionsAdminConnection struct {
 type remoteScaleSet struct {
 	ID              int    `json:"id"`
 	Name            string `json:"name"`
-	RunnerGroupID   int    `json:"runnerGroupId"`
 	RunnerGroupName string `json:"runnerGroupName"`
 }
 
@@ -208,8 +196,6 @@ func run(args []string) int {
 	case "version":
 		fmt.Printf("aktion %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 		return 0
-	case "init":
-		return cmdInit(absRoot, *configName)
 	case "features":
 		return cmdFeatures()
 	}
@@ -351,7 +337,6 @@ Usage:
   aktion [--root DIR] [--color auto|always|never] [--links auto|always|never] <command> [args]
 
 Commands:
-  init              Create config.json from config.example.json
   features          List Aktion builtins and default OCI Features
   config            Render and validate Compose configuration
   config resolve ID Resolve the effective runner config for one repository
@@ -382,7 +367,6 @@ Links:
   NO_HYPERLINK=1   Disable hyperlinks in auto mode
 
 Examples:
-  aktion init
   aktion doctor
   aktion config resolve repo-a
   aktion up
@@ -392,22 +376,6 @@ Examples:
   aktion logs repo-a`)
 }
 
-func cmdInit(root, configName string) int {
-	dst := filepath.Join(root, configName)
-	if _, err := os.Stat(dst); err == nil {
-		return fail(fmt.Errorf("%s already exists", dst))
-	}
-	src := filepath.Join(root, "config.example.json")
-	b, err := os.ReadFile(src)
-	if err != nil {
-		return fail(fmt.Errorf("read %s: %w", src, err))
-	}
-	if err := os.WriteFile(dst, b, 0600); err != nil {
-		return fail(err)
-	}
-	fmt.Println("Created:", dst)
-	return 0
-}
 
 func intOr(p *int, d int) int {
 	if p != nil {
@@ -427,7 +395,7 @@ func loadConfig(root, configName string) (Loaded, error) {
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return Loaded{}, fmt.Errorf("missing %s; copy config.example.json to %s and edit it", p, p)
+			return Loaded{}, fmt.Errorf("missing configuration file: %s", p)
 		}
 		return Loaded{}, err
 	}
@@ -484,18 +452,9 @@ func loadConfig(root, configName string) (Loaded, error) {
 	}
 
 	defImage := ""
-	defFeatures := runnerfeatures.Selections{}
-	var defPresets []string
-	if len(cfg.Defaults.Extends) == 0 {
-		defFeatures = cfg.Defaults.RunnerFeatures
-		if defFeatures == nil {
-			defFeatures = runnerfeatures.DefaultSelections()
-		}
-		defFeatures, err = runnerfeatures.NormalizeSelections(defFeatures)
-		if err != nil {
-			return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
-		}
-	} else {
+	defFeatures := runnerfeatures.DefaultSelections()
+	if cfg.Defaults.Extends != nil {
+		defFeatures = runnerfeatures.Selections{}
 		for _, ref := range cfg.Defaults.Extends {
 			if ref == "defaults" {
 				return Loaded{}, errors.New("defaults.extends cannot reference defaults")
@@ -511,13 +470,12 @@ func loadConfig(root, configName string) (Loaded, error) {
 			if preset.RunnerImage != "" {
 				defImage = preset.RunnerImage
 			}
-			defPresets = append(defPresets, preset.Canonical)
 		}
-		if cfg.Defaults.RunnerFeatures != nil {
-			defFeatures, err = runnerpreset.MergeFeatures(defFeatures, cfg.Defaults.RunnerFeatures)
-			if err != nil {
-				return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
-			}
+	}
+	if cfg.Defaults.RunnerFeatures != nil {
+		defFeatures, err = runnerpreset.MergeFeatures(defFeatures, cfg.Defaults.RunnerFeatures)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
 		}
 	}
 	if cfg.Defaults.RunnerImage != "" {
@@ -558,25 +516,11 @@ func loadConfig(root, configName string) (Loaded, error) {
 		}
 		features := runnerfeatures.CloneSelections(defFeatures)
 		baseImage := defImage
-		resolvedPresets := append([]string(nil), defPresets...)
-		if len(r.Extends) == 0 {
-			if r.RunnerFeatures != nil {
-				features, err = runnerfeatures.NormalizeSelections(r.RunnerFeatures)
-				if err != nil {
-					return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
-				}
-			}
-		} else {
+		if r.Extends != nil {
 			features = runnerfeatures.Selections{}
 			baseImage = ""
-			resolvedPresets = nil
-			seenDefaults := false
 			for _, ref := range r.Extends {
 				if ref == "defaults" {
-					if seenDefaults {
-						return Loaded{}, fmt.Errorf("repository %q extends defaults more than once", r.ID)
-					}
-					seenDefaults = true
 					features, err = runnerpreset.MergeFeatures(features, defFeatures)
 					if err != nil {
 						return Loaded{}, fmt.Errorf("repository %q extends defaults: %w", r.ID, err)
@@ -584,7 +528,6 @@ func loadConfig(root, configName string) (Loaded, error) {
 					if defImage != "" {
 						baseImage = defImage
 					}
-					resolvedPresets = append(resolvedPresets, defPresets...)
 					continue
 				}
 				preset, err := fetchPreset(ref)
@@ -598,13 +541,12 @@ func loadConfig(root, configName string) (Loaded, error) {
 				if preset.RunnerImage != "" {
 					baseImage = preset.RunnerImage
 				}
-				resolvedPresets = append(resolvedPresets, preset.Canonical)
 			}
-			if r.RunnerFeatures != nil {
-				features, err = runnerpreset.MergeFeatures(features, r.RunnerFeatures)
-				if err != nil {
-					return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
-				}
+		}
+		if r.RunnerFeatures != nil {
+			features, err = runnerpreset.MergeFeatures(features, r.RunnerFeatures)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
 			}
 		}
 		if r.RunnerImage != "" {
@@ -629,14 +571,13 @@ func loadConfig(root, configName string) (Loaded, error) {
 			BaseImage:         baseImage,
 			Features:          featureIDs,
 			FeatureSelections: features,
-			ResolvedPresets:   resolvedPresets,
 		})
 	}
 	if len(repos) == 0 {
 		return Loaded{}, errors.New("no enabled repositories in config.json")
 	}
 	sort.Slice(repos, func(i, j int) bool { return repos[i].ServiceID < repos[j].ServiceID })
-	return Loaded{Root: root, ConfigPath: p, KeyPath: keyPath, Config: cfg, Repos: repos}, nil
+	return Loaded{Root: root, KeyPath: keyPath, Config: cfg, Repos: repos}, nil
 }
 
 
@@ -650,15 +591,17 @@ func cmdConfigResolve(l Loaded, id string) int {
 		owner, repo, _ := parseGitHubRepoURL(r.URL)
 		payload := struct {
 			Repository string                    `json:"repository"`
-			Extends    runnerpreset.Extends      `json:"extends,omitempty"`
-			Presets    []string                  `json:"presets,omitempty"`
+			Extends    []string                  `json:"extends,omitempty"`
+			MinRunners int                       `json:"minRunners"`
+			MaxRunners int                       `json:"maxRunners"`
 			BaseImage  string                    `json:"baseImage"`
 			Image      string                    `json:"image"`
 			Features   runnerfeatures.Selections `json:"features"`
 		}{
 			Repository: owner + "/" + repo,
 			Extends:    r.Extends,
-			Presets:    r.ResolvedPresets,
+			MinRunners: r.Min,
+			MaxRunners: r.Max,
 			BaseImage:  r.BaseImage,
 			Image:      r.Image,
 			Features:   r.FeatureSelections,
@@ -720,7 +663,7 @@ func cmdFeatures() int {
 	fmt.Println(ui.table([]string{"FEATURE", "DEFAULT", "DESCRIPTION", "DEPENDS ON"}, rows))
 	fmt.Println()
 	fmt.Println(ui.renderStyle("muted", "Any public OCI Dev Container Feature URI is supported, e.g. ghcr.io/devcontainers/features/node:1."))
-	fmt.Println(ui.renderStyle("muted", "Omit defaults.runnerFeatures to use Aktion defaults; use {} for the unmodified base runner image."))
+	fmt.Println(ui.renderStyle("muted", "Omit defaults.runnerFeatures to use Aktion defaults; use extends: [] for an unmodified base runner image."))
 	return 0
 }
 
@@ -828,6 +771,13 @@ func validateCapacity(name string, min, max int) error {
 		return fmt.Errorf("%s: minRunners cannot exceed maxRunners", name)
 	}
 	return nil
+}
+
+func formatMaxRunners(max int) string {
+	if max == 0 {
+		return "∞"
+	}
+	return strconv.Itoa(max)
 }
 
 var nonService = regexp.MustCompile(`[^a-z0-9_-]+`)
@@ -1124,12 +1074,10 @@ func collectActiveJobs(l Loaded) map[string]activeJob {
 				}
 				jobs[runner] = activeJob{
 					Repository:  repo,
-					Runner:      runner,
 					JobID:       logField(line, "jobId"),
 					JobName:     logField(line, "jobDisplayName"),
 					WorkflowRef: logField(line, "jobWorkflowRef"),
 					WorkflowRun: runID,
-					EventName:   logField(line, "eventName"),
 					StartedAt:   started,
 				}
 			}
@@ -1158,10 +1106,7 @@ func collectRepoDemand(l Loaded) map[string]repoDemand {
 				continue
 			}
 			assigned, _ := strconv.Atoi(logField(line, "assignedJobs"))
-			current, _ := strconv.Atoi(logField(line, "currentRunners"))
-			target, _ := strconv.Atoi(logField(line, "targetRunners"))
-			seen, _ := time.Parse(time.RFC3339Nano, logField(line, "time"))
-			out[key] = repoDemand{Assigned: assigned, Current: current, Target: target, SeenAt: seen}
+			out[key] = repoDemand{Assigned: assigned}
 		}	}
 	return out
 }
@@ -1324,7 +1269,7 @@ func cmdStatus(l Loaded) int {
 			}
 			jobSummary = fmt.Sprintf("%d run / %d wait", activePerRepo[full], pending)
 		}
-		tableRows = append(tableRows, []tableCell{linkedAccentCell(full, repoWebURL(full)), infoCell(r.ScaleSet), styledCell(state, stateStyle), cell(fmt.Sprintf("%d → %d", r.Min, r.Max)), cell(runnerSummary), linkedCell(jobSummary, "", repoActionsURL(full))})
+		tableRows = append(tableRows, []tableCell{linkedAccentCell(full, repoWebURL(full)), infoCell(r.ScaleSet), styledCell(state, stateStyle), cell(fmt.Sprintf("%d → %s", r.Min, formatMaxRunners(r.Max))), cell(runnerSummary), linkedCell(jobSummary, "", repoActionsURL(full))})
 	}
 	fmt.Println(ui.table([]string{"REPOSITORY", "SCALE SET", "LISTENER", "CAPACITY", "RUNNERS", "JOBS"}, tableRows))
 	if staleHint {

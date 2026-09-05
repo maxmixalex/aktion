@@ -66,6 +66,12 @@ func TestPerRepositoryCapacityOverrides(t *testing.T) {
       "id": "repo-b",
       "url": "https://github.com/example/repo-b",
       "enabled": true
+    },
+    {
+      "id": "repo-c",
+      "url": "https://github.com/example/repo-c",
+      "enabled": true,
+      "maxRunners": 0
     }
   ]
 }`
@@ -76,8 +82,8 @@ func TestPerRepositoryCapacityOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Repos) != 2 {
-		t.Fatalf("got %d repos, want 2", len(loaded.Repos))
+	if len(loaded.Repos) != 3 {
+		t.Fatalf("got %d repos, want 3", len(loaded.Repos))
 	}
 	byID := map[string]RepoResolved{}
 	for _, r := range loaded.Repos {
@@ -88,6 +94,12 @@ func TestPerRepositoryCapacityOverrides(t *testing.T) {
 	}
 	if got := byID["repo-b"]; got.Min != 0 || got.Max != 1 {
 		t.Fatalf("repo-b capacity=%d/%d, want inherited 0/1", got.Min, got.Max)
+	}
+	if got := byID["repo-c"]; got.Min != 0 || got.Max != 0 {
+		t.Fatalf("repo-c capacity=%d/%d, want unlimited max", got.Min, got.Max)
+	}
+	if got := formatMaxRunners(0); got != "∞" {
+		t.Fatalf("formatMaxRunners(0)=%q", got)
 	}
 }
 
@@ -235,8 +247,8 @@ func TestRunnerFeaturesHostSideExtendsDefaults(t *testing.T) {
 		"  },\n" +
 		"  \"repositories\": [\n" +
 		"    {\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true},\n" +
-		"    {\"id\":\"repo-b\",\"url\":\"https://github.com/example/repo-b\",\"enabled\":true,\"runnerFeatures\":{}},\n" +
-		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"extends\":\"defaults\",\"runnerFeatures\":{\"builtin:build\":false,\"builtin:svn\":{},\"ghcr.io/devcontainers/features/python:1\":{\"version\":\"3.13\"}}}\n" +
+		"    {\"id\":\"repo-b\",\"url\":\"https://github.com/example/repo-b\",\"enabled\":true,\"extends\":[],\"runnerFeatures\":{}},\n" +
+		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"extends\":[\"defaults\"],\"runnerFeatures\":{\"builtin:build\":false,\"builtin:svn\":{},\"ghcr.io/devcontainers/features/python:1\":{\"version\":\"3.13\"}}}\n" +
 		"  ]\n" +
 		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
@@ -276,7 +288,7 @@ func TestRepositoryExtendsRejectsInvalidOCIReference(t *testing.T) {
 	cfg := "{\n" +
 		"  \"app\": {\"clientId\":\"Iv123\",\"installationId\":123,\"privateKeyFile\":\"./app.pem\"},\n" +
 		"  \"defaults\": {\"scaleSetName\":\"home-docker\",\"minRunners\":0,\"maxRunners\":1},\n" +
-		"  \"repositories\": [{\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true,\"extends\":\"anything\"}]\n" +
+		"  \"repositories\": [{\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true,\"extends\":[\"anything\"]}]\n" +
 		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
 		t.Fatal(err)
@@ -307,7 +319,6 @@ func TestDefaultRunnerFeaturesAreAppliedWhenOmitted(t *testing.T) {
 	got := strings.Join(loaded.Repos[0].Features, ",")
 	for _, want := range []string{
 		"builtin:build",
-		"builtin:native",
 		"builtin:clang",
 		"ghcr.io/devcontainers/features/common-utils:2",
 		"ghcr.io/devcontainers/features/python:1",

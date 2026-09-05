@@ -39,19 +39,6 @@ for arch in amd64 arm64; do
     -o "$out/aktion-listener-linux-${arch}" ./cmd/aktion-listener
 done
 
-(
-  cd "$out"
-  sha256sum \
-    aktion-linux-amd64 \
-    aktion-linux-arm64 \
-    aktion-windows-amd64.exe \
-    aktion-windows-arm64.exe \
-    aktion-darwin-amd64 \
-    aktion-darwin-arm64 \
-    aktion-listener-linux-amd64 \
-    aktion-listener-linux-arm64 \
-    > SHA256SUMS
-)
 
 echo
 echo "Artifacts:"
