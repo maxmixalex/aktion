@@ -13,6 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -29,8 +30,11 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Resolve and build official OCI Features
+      - name: Resolve, inspect, and build official OCI Features
         env:
           AKTION_TEST_OCI: '1'
           AKTION_TEST_DOCKER: '1'
         run: go test ./internal/runnerfeatures -run TestOfficialOCIDefaults -v -count=1
+
+      - name: Cross-build all release binaries
+        run: bash ./scripts/build-artifacts.sh dist
