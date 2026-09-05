@@ -63,12 +63,14 @@ func runListener(ctx context.Context, c Config) error {
 		}
 		runnerGroupID = runnerGroup.ID
 	}
-	scaleSet, err := scalesetClient.CreateRunnerScaleSet(ctx, &scaleset.RunnerScaleSet{
-		Name: c.ScaleSetName, RunnerGroupID: runnerGroupID, Labels: c.BuildLabels(),
-		RunnerSetting: scaleset.RunnerSetting{DisableUpdate: true},
-	})
+	scaleSet, reused, err := getOrCreateRunnerScaleSet(ctx, scalesetClient, runnerGroupID, c.ScaleSetName, c.BuildLabels())
 	if err != nil {
-		return fmt.Errorf("failed to create runner scale set: %w", err)
+		return err
+	}
+	if reused {
+		logger.Info("Reusing existing runner scale set", slog.Int("scaleSetID", scaleSet.ID), slog.String("scaleSetName", scaleSet.Name))
+	} else {
+		logger.Info("Created runner scale set", slog.Int("scaleSetID", scaleSet.ID), slog.String("scaleSetName", scaleSet.Name))
 	}
 	scalesetClient.SetSystemInfo(systemInfo(scaleSet.ID))
 	defer func() {
