@@ -38,7 +38,7 @@ jobs:
         shell: bash
         env:
           AKTION_VERSION: bootstrap-${{ github.sha }}
-        run: ./scripts/build-artifacts.sh dist
+        run: bash ./scripts/build-artifacts.sh dist
 
       - name: Upload recovery binaries
         uses: actions/upload-artifact@v4
