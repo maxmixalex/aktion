@@ -24,6 +24,9 @@ jobs:
           go-version: '1.25.3'
           cache: true
 
+      - name: Resolve modules
+        run: go mod tidy
+
       - name: Test listener
         run: go test ./cmd/aktion-listener
 
@@ -37,7 +40,8 @@ jobs:
               go build -trimpath \
               -o "dist/aktion-listener-linux-${arch}" ./cmd/aktion-listener
           done
-          (cd dist && sha256sum * > SHA256SUMS)
+          cp go.sum dist/go.sum
+          (cd dist && sha256sum aktion-listener-linux-* > SHA256SUMS)
 
       - name: Upload listener recovery artifact
         uses: actions/upload-artifact@v4
