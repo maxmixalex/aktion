@@ -267,7 +267,7 @@ func TestRunnerFeaturesHostSideExtendsDefaults(t *testing.T) {
 	}
 }
 
-func TestRepositoryExtendsRejectsUnknownBase(t *testing.T) {
+func TestRepositoryExtendsRejectsInvalidOCIReference(t *testing.T) {
 	dir := t.TempDir()
 	key := filepath.Join(dir, "app.pem")
 	if err := os.WriteFile(key, []byte("placeholder"), 0600); err != nil {
@@ -281,8 +281,8 @@ func TestRepositoryExtendsRejectsUnknownBase(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadConfig(dir, "config.json"); err == nil || !strings.Contains(err.Error(), "extends must be \"defaults\"") {
-		t.Fatalf("expected invalid extends error, got %v", err)
+	if _, err := loadConfig(dir, "config.json"); err == nil || !strings.Contains(err.Error(), "OCI reference must look like") {
+		t.Fatalf("expected invalid OCI extends error, got %v", err)
 	}
 }
 

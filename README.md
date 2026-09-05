@@ -16,7 +16,7 @@ Aktion is a lightweight GitHub Runner Scale Set manager for Docker hosts. It kee
 - stale scale-set reconciliation and cleanup
 - optional HTTP/HTTPS proxy forwarding into listener and job containers
 - OCI Dev Container Features for runner environments
-- host-controlled default → repository runner inheritance
+- host-controlled defaults / OCI presets → repository runner inheritance
 - no Kubernetes / ARC cluster required
 
 Aktion uses GitHub's standalone [`actions/scaleset`](https://github.com/actions/scaleset) client for the Runner Scale Set protocol.
@@ -92,15 +92,18 @@ Copy `config.example.json` to `config.json`, place the GitHub App PEM under `sec
 
 Repository values override `defaults`; omitted values inherit them.
 
-Runner environment policy stays entirely on the host. A repository that only
-needs a few additions can explicitly extend the host defaults:
+Runner environment policy stays entirely on the host. Aktion does not read
+`.github/aktion.yml` or any equivalent file from target repositories, so a
+repository cannot grant itself additional runner capabilities.
+
+The simplest repository inheritance remains:
 
 ```json
 {
-  "id": "repo-b",
-  "url": "https://github.com/YOUR_NAME/YOUR_PRIVATE_REPO_B",
+  "id": "hpclang",
+  "url": "https://github.com/zyf722/hpclang",
   "enabled": true,
-  "extends": "defaults",
+  "extends": ["defaults"],
   "runnerFeatures": {
     "builtin:glib": {},
     "builtin:gtk4": {},
@@ -110,10 +113,58 @@ needs a few additions can explicitly extend the host defaults:
 }
 ```
 
-`extends` is intentionally limited to `"defaults"`: Aktion has only two
-configuration levels, host defaults and per-repository overrides. There are no
-repository-owned Aktion configuration files and no arbitrary preset inheritance
-chain.
+The host may also reference real OCI runner presets:
+
+```json
+{
+  "id": "hpclang",
+  "url": "https://github.com/zyf722/hpclang",
+  "enabled": true,
+  "extends": [
+    "defaults",
+    "ghcr.io/YOUR_NAME/aktion-presets/native-extra:1"
+  ],
+  "runnerFeatures": {
+    "builtin:gtk4": {}
+  }
+}
+```
+
+`defaults.extends` accepts OCI preset references only.
+`repositories[].extends` may mix the special `"defaults"` value with OCI
+preset references. Sources are applied left-to-right; the host-local
+`runnerImage` and `runnerFeatures` fields are applied last.
+
+To keep this model deliberately shallow, an OCI runner preset cannot extend
+another preset. It is only a versioned runner environment description:
+
+```json
+{
+  "version": 1,
+  "runnerImage": "ghcr.io/actions/actions-runner:latest",
+  "runnerFeatures": {
+    "builtin:build": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
+    }
+  }
+}
+```
+
+Aktion runner presets use OCI artifact type
+`application/vnd.aktion.runner-preset.v1` and JSON layer media type
+`application/vnd.aktion.runner-preset.v1+json`. For example:
+
+```bash
+oras push \
+  --artifact-type application/vnd.aktion.runner-preset.v1 \
+  ghcr.io/YOUR_NAME/aktion-presets/native-extra:1 \
+  preset.json:application/vnd.aktion.runner-preset.v1+json
+```
+
+As with Dev Container Features, public registries using anonymous/Bearer-token
+pull are currently supported. Digest-pinned references such as
+`@sha256:...` are also accepted.
 
 ## Runner Features
 

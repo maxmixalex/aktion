@@ -16,7 +16,7 @@ Aktion 是一个面向 Docker host 的轻量 GitHub Runner Scale Set manager：�
 - stale scale set 自动复用/reconcile 与显式 `cleanup`
 - HTTP/HTTPS proxy 透传到 listener 和 runner
 - 直接消费 OCI Dev Container Features 构建 runner 环境
-- 完全由 host 控制的 defaults → repository runner 继承
+- 完全由 host 控制的 defaults / OCI preset → repository runner 继承
 - 不需要 Kubernetes / ARC cluster
 
 Aktion 底层使用 GitHub 官方 [`actions/scaleset`](https://github.com/actions/scaleset) 实现 Scale Set 协议。
@@ -48,17 +48,19 @@ aktion up
 aktion status
 ```
 
-## Host 侧 runner 继承
+## Host 侧 runner 继承与 OCI preset
 
-runner 环境完全由 host 的 `config.json` 决定。某个仓库只需要在默认环境上
-追加少量能力时，可以显式继承 `defaults`：
+runner 环境仍然**完全由 host 的 `config.json` 决定**。Aktion 不读取目标仓库里的
+`.github/aktion.yml` 或任何等价文件，repository 本身不能扩大 runner 能力。
+
+最简单的 repo 继承仍然是：
 
 ```json
 {
   "id": "hpclang",
   "url": "https://github.com/zyf722/hpclang",
   "enabled": true,
-  "extends": "defaults",
+  "extends": ["defaults"],
   "runnerFeatures": {
     "builtin:glib": {},
     "builtin:gtk4": {},
@@ -68,9 +70,67 @@ runner 环境完全由 host 的 `config.json` 决定。某个仓库只需要在�
 }
 ```
 
-`extends` 目前刻意只允许 `"defaults"`。Aktion 只有两层配置：
-host defaults 和 per-repository override，不支持仓库自己的 Aktion 配置文件，
-也不支持任意多层 preset 继承。
+`extends` 也可以由 host 指向真实 OCI runner preset：
+
+```json
+{
+  "id": "hpclang",
+  "url": "https://github.com/zyf722/hpclang",
+  "enabled": true,
+  "extends": [
+    "defaults",
+    "ghcr.io/YOUR_NAME/aktion-presets/native-extra:1"
+  ],
+  "runnerFeatures": {
+    "builtin:gtk4": {}
+  }
+}
+```
+
+`defaults.extends` 可以包含 OCI preset，但不能包含特殊值 `"defaults"`。
+`repositories[].extends` 可以按顺序混合 `"defaults"` 和 OCI preset。
+后面的来源覆盖前面的来源，最后由同一段 host config 中的
+`runnerImage` / `runnerFeatures` 覆盖。
+
+为了避免重新演化成复杂配置系统，**OCI preset 自身不能再 extends 其它 preset**。
+它只是一个不可执行的 runner 环境描述：
+
+```json
+{
+  "version": 1,
+  "runnerImage": "ghcr.io/actions/actions-runner:latest",
+  "runnerFeatures": {
+    "builtin:build": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
+    }
+  }
+}
+```
+
+Aktion runner preset 使用 OCI artifact type：
+
+```text
+application/vnd.aktion.runner-preset.v1
+```
+
+JSON layer media type：
+
+```text
+application/vnd.aktion.runner-preset.v1+json
+```
+
+例如可用 ORAS 发布：
+
+```bash
+oras push \
+  --artifact-type application/vnd.aktion.runner-preset.v1 \
+  ghcr.io/YOUR_NAME/aktion-presets/native-extra:1 \
+  preset.json:application/vnd.aktion.runner-preset.v1+json
+```
+
+目前和 Dev Container Features 一样，runner preset 支持 public registry 的
+anonymous/Bearer-token pull，也可用 `@sha256:...` 固定到不可变 digest。
 
 ## Runner Features
 
@@ -157,8 +217,8 @@ ghcr.io/devcontainers/features/git-lfs:1
 在 repository 层，省略 `runnerFeatures` 表示直接继承 defaults。
 如果写了 `runnerFeatures` 但没有 `extends`，仍保持原来的“整段替换”语义；
 因此显式 `{}` 表示完全不加 Feature，直接使用 `runnerImage`。
-如果同时写 `"extends": "defaults"`，则 repository 的 Feature 会增量合并到
-host defaults 上；同一个 Feature 的 options 做浅层覆盖。
+如果写了 `extends`，则其中的 `defaults` / OCI preset 会按顺序增量合并；
+同一个 Feature 的 options 做浅层覆盖，`false` 可以删除继承项。
 
 `aktion features` 会列出 Aktion builtin 和默认 OCI Feature，但并不是 allow-list；任意兼容的 public OCI Dev Container Feature URI 都可以直接写进配置。
 

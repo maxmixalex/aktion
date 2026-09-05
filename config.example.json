@@ -43,7 +43,7 @@
       "enabled": false,
       "minRunners": 1,
       "maxRunners": 2,
-      "extends": "defaults",
+      "extends": ["defaults"],
       "runnerFeatures": {
         "builtin:glib": {},
         "builtin:gtk4": {},

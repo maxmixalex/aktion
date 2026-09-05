@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/zyf722/aktion/internal/runnerfeatures"
+	"github.com/zyf722/aktion/internal/runnerpreset"
 )
 
 const githubAPIVersion = "2026-03-10"
@@ -54,6 +55,7 @@ type AppConfig struct {
 }
 
 type Defaults struct {
+	Extends        runnerpreset.Extends      `json:"extends,omitempty"`
 	ScaleSetName   string                    `json:"scaleSetName"`
 	MinRunners     *int                      `json:"minRunners"`
 	MaxRunners     *int                      `json:"maxRunners"`
@@ -67,7 +69,7 @@ type Repository struct {
 	ID             string                    `json:"id"`
 	URL            string                    `json:"url"`
 	Enabled        bool                      `json:"enabled"`
-	Extends        string                    `json:"extends,omitempty"`
+	Extends        runnerpreset.Extends      `json:"extends,omitempty"`
 	InstallationID *int64                    `json:"installationId,omitempty"`
 	ScaleSetName   string                    `json:"scaleSetName,omitempty"`
 	MinRunners     *int                      `json:"minRunners,omitempty"`
@@ -91,6 +93,7 @@ type RepoResolved struct {
 	BaseImage          string
 	Features           []string
 	FeatureSelections  runnerfeatures.Selections
+	ResolvedPresets    []string
 }
 
 type Loaded struct {
@@ -460,16 +463,65 @@ func loadConfig(root, configName string) (Loaded, error) {
 	defMin := intOr(cfg.Defaults.MinRunners, 0)
 	defMax := intOr(cfg.Defaults.MaxRunners, 1)
 	defLog := strOr(cfg.Defaults.LogLevel, "info")
-	defFeatures := cfg.Defaults.RunnerFeatures
-	if defFeatures == nil {
-		defFeatures = runnerfeatures.DefaultSelections()
-	}
-	defFeatures, err = runnerfeatures.NormalizeSelections(defFeatures)
-	if err != nil {
-		return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
-	}
 	if err := validateCapacity("defaults", defMin, defMax); err != nil {
 		return Loaded{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	presetSource := runnerpreset.NewSource(runnerfeatures.DefaultCacheDir())
+	presetCache := map[string]runnerpreset.Resolved{}
+	fetchPreset := func(ref string) (runnerpreset.Resolved, error) {
+		if cached, ok := presetCache[ref]; ok {
+			return cached, nil
+		}
+		preset, err := presetSource.Fetch(ctx, ref)
+		if err != nil {
+			return runnerpreset.Resolved{}, err
+		}
+		presetCache[ref] = preset
+		return preset, nil
+	}
+
+	defImage := ""
+	defFeatures := runnerfeatures.Selections{}
+	var defPresets []string
+	if len(cfg.Defaults.Extends) == 0 {
+		defFeatures = cfg.Defaults.RunnerFeatures
+		if defFeatures == nil {
+			defFeatures = runnerfeatures.DefaultSelections()
+		}
+		defFeatures, err = runnerfeatures.NormalizeSelections(defFeatures)
+		if err != nil {
+			return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
+		}
+	} else {
+		for _, ref := range cfg.Defaults.Extends {
+			if ref == "defaults" {
+				return Loaded{}, errors.New("defaults.extends cannot reference defaults")
+			}
+			preset, err := fetchPreset(ref)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("defaults.extends %q: %w", ref, err)
+			}
+			defFeatures, err = runnerpreset.MergeFeatures(defFeatures, preset.RunnerFeatures)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("defaults.extends %q: %w", ref, err)
+			}
+			if preset.RunnerImage != "" {
+				defImage = preset.RunnerImage
+			}
+			defPresets = append(defPresets, preset.Canonical)
+		}
+		if cfg.Defaults.RunnerFeatures != nil {
+			defFeatures, err = runnerpreset.MergeFeatures(defFeatures, cfg.Defaults.RunnerFeatures)
+			if err != nil {
+				return Loaded{}, fmt.Errorf("defaults.runnerFeatures: %w", err)
+			}
+		}
+	}
+	if cfg.Defaults.RunnerImage != "" {
+		defImage = cfg.Defaults.RunnerImage
 	}
 
 	seen := map[string]bool{}
@@ -504,24 +556,65 @@ func loadConfig(root, configName string) (Loaded, error) {
 		if r.InstallationID != nil {
 			inst = *r.InstallationID
 		}
-		if r.Extends != "" && r.Extends != "defaults" {
-			return Loaded{}, fmt.Errorf("repository %q extends must be \"defaults\" when set", r.ID)
-		}
 		features := runnerfeatures.CloneSelections(defFeatures)
-		if r.RunnerFeatures != nil {
-			if r.Extends == "defaults" {
-				features, err = extendRunnerFeatures(defFeatures, r.RunnerFeatures)
-			} else {
+		baseImage := defImage
+		resolvedPresets := append([]string(nil), defPresets...)
+		if len(r.Extends) == 0 {
+			if r.RunnerFeatures != nil {
 				features, err = runnerfeatures.NormalizeSelections(r.RunnerFeatures)
+				if err != nil {
+					return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
+				}
 			}
-			if err != nil {
-				return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
+		} else {
+			features = runnerfeatures.Selections{}
+			baseImage = ""
+			resolvedPresets = nil
+			seenDefaults := false
+			for _, ref := range r.Extends {
+				if ref == "defaults" {
+					if seenDefaults {
+						return Loaded{}, fmt.Errorf("repository %q extends defaults more than once", r.ID)
+					}
+					seenDefaults = true
+					features, err = runnerpreset.MergeFeatures(features, defFeatures)
+					if err != nil {
+						return Loaded{}, fmt.Errorf("repository %q extends defaults: %w", r.ID, err)
+					}
+					if defImage != "" {
+						baseImage = defImage
+					}
+					resolvedPresets = append(resolvedPresets, defPresets...)
+					continue
+				}
+				preset, err := fetchPreset(ref)
+				if err != nil {
+					return Loaded{}, fmt.Errorf("repository %q extends %q: %w", r.ID, ref, err)
+				}
+				features, err = runnerpreset.MergeFeatures(features, preset.RunnerFeatures)
+				if err != nil {
+					return Loaded{}, fmt.Errorf("repository %q extends %q: %w", r.ID, ref, err)
+				}
+				if preset.RunnerImage != "" {
+					baseImage = preset.RunnerImage
+				}
+				resolvedPresets = append(resolvedPresets, preset.Canonical)
+			}
+			if r.RunnerFeatures != nil {
+				features, err = runnerpreset.MergeFeatures(features, r.RunnerFeatures)
+				if err != nil {
+					return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
+				}
 			}
 		}
-		imageName, baseImage, err := runnerfeatures.ImageName(strOr(r.RunnerImage, cfg.Defaults.RunnerImage), features)
+		if r.RunnerImage != "" {
+			baseImage = r.RunnerImage
+		}
+		imageName, normalizedBaseImage, err := runnerfeatures.ImageName(baseImage, features)
 		if err != nil {
 			return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
 		}
+		baseImage = normalizedBaseImage
 		featureIDs := runnerfeatures.SelectionKeys(features)
 		repos = append(repos, RepoResolved{
 			Repository:     r,
@@ -536,6 +629,7 @@ func loadConfig(root, configName string) (Loaded, error) {
 			BaseImage:         baseImage,
 			Features:          featureIDs,
 			FeatureSelections: features,
+			ResolvedPresets:   resolvedPresets,
 		})
 	}
 	if len(repos) == 0 {
@@ -547,46 +641,6 @@ func loadConfig(root, configName string) (Loaded, error) {
 
 
 
-func extendRunnerFeatures(base, overlay runnerfeatures.Selections) (runnerfeatures.Selections, error) {
-	base, err := runnerfeatures.NormalizeSelections(base)
-	if err != nil {
-		return nil, err
-	}
-	out := runnerfeatures.CloneSelections(base)
-	if out == nil {
-		out = runnerfeatures.Selections{}
-	}
-	seen := map[string]bool{}
-	for rawRef, options := range overlay {
-		ref, err := runnerfeatures.NormalizeReference(rawRef)
-		if err != nil {
-			return nil, err
-		}
-		if seen[ref] {
-			return nil, fmt.Errorf("duplicate feature after normalization: %q", ref)
-		}
-		seen[ref] = true
-		if options == nil {
-			delete(out, ref)
-			continue
-		}
-		normalized, err := runnerfeatures.NormalizeSelections(runnerfeatures.Selections{ref: options})
-		if err != nil {
-			return nil, err
-		}
-		merged := runnerfeatures.Options{}
-		if existing, ok := out[ref]; ok {
-			for key, value := range existing {
-				merged[key] = value
-			}
-		}
-		for key, value := range normalized[ref] {
-			merged[key] = value
-		}
-		out[ref] = merged
-	}
-	return out, nil
-}
 
 func cmdConfigResolve(l Loaded, id string) int {
 	for _, r := range l.Repos {
@@ -596,13 +650,15 @@ func cmdConfigResolve(l Loaded, id string) int {
 		owner, repo, _ := parseGitHubRepoURL(r.URL)
 		payload := struct {
 			Repository string                    `json:"repository"`
-			Extends    string                    `json:"extends,omitempty"`
+			Extends    runnerpreset.Extends      `json:"extends,omitempty"`
+			Presets    []string                  `json:"presets,omitempty"`
 			BaseImage  string                    `json:"baseImage"`
 			Image      string                    `json:"image"`
 			Features   runnerfeatures.Selections `json:"features"`
 		}{
 			Repository: owner + "/" + repo,
 			Extends:    r.Extends,
+			Presets:    r.ResolvedPresets,
 			BaseImage:  r.BaseImage,
 			Image:      r.Image,
 			Features:   r.FeatureSelections,
