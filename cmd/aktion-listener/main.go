@@ -85,6 +85,10 @@ func runListener(ctx context.Context, c Config) error {
 	if err := ensureRunnerImage(ctx, dockerClient, c.RunnerImage, logger); err != nil {
 		return err
 	}
+	runnerRuntime, err := loadRunnerFeatureRuntime(ctx, dockerClient, c.RunnerImage)
+	if err != nil {
+		return err
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -110,6 +114,7 @@ func runListener(ctx context.Context, c Config) error {
 		logger: logger.WithGroup("scaler"),
 		runners: runnerState{idle: make(map[string]string), busy: make(map[string]string)},
 		runnerImage: c.RunnerImage,
+		runnerRuntime: runnerRuntime,
 		minRunners: c.MinRunners,
 		maxRunners: c.MaxRunners,
 		dockerClient: dockerClient,
