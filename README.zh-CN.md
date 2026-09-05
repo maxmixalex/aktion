@@ -15,6 +15,7 @@ Aktion 是一个面向 Docker host 的轻量 GitHub Runner Scale Set manager：�
 - Rich 风格终端状态：repo → runner → job，并支持 OSC 8 可点击链接
 - stale scale set 诊断与 `cleanup`
 - HTTP/HTTPS proxy 透传到 listener 和真正执行 job 的 runner
+- 可组合的 runner image features
 - 不需要 Kubernetes / ARC cluster
 
 Aktion 底层继续使用 GitHub 官方 [`actions/scaleset`](https://github.com/actions/scaleset) 实现 Scale Set 协议。
@@ -48,6 +49,40 @@ aktion status
 
 配置结构见 `config.example.json`。repo 中的 `minRunners/maxRunners` 会覆盖 defaults。
 
+## Runner Features
+
+Aktion 不要求所有仓库共享一个越来越大的 runner 镜像，而是提供类似 Dev Container Features 的可组合 runner feature。每个内置 feature 都由 metadata + 幂等 `install.sh` 组成，支持 `dependsOn` 硬依赖和 `installsAfter` 软排序。
+
+默认 feature 集：
+
+```json
+"runnerFeatures": ["build", "network", "python", "archives", "native"]
+```
+
+它覆盖通用 C/C++/autotools/CMake/Ninja 构建工具、网络/源码工具、Python、压缩工具和常用 native headers。额外可选：`glib`、`gtk4`、`ncurses`、`lua54`。
+
+仓库可以完整覆盖 defaults：
+
+```json
+{
+  "id": "hpclang",
+  "url": "https://github.com/zyf722/hpclang",
+  "enabled": true,
+  "runnerFeatures": [
+    "build", "network", "python", "archives", "native",
+    "glib", "gtk4", "ncurses", "lua54"
+  ]
+}
+```
+
+省略 `runnerFeatures` 表示继承；显式 `[]` 表示完全不加 Aktion feature，直接使用 base runner image。 `runnerImage` 可以理解为 feature 链的 base image。
+
+Aktion 会解析依赖后，为每个 feature 生成一个独立 Docker stage/layer，并根据 base image + feature 内容生成稳定的 `local/aktion-runner:<hash>` tag。多个仓库采用同一组合时共用镜像和 Docker cache。 `aktion features` 可列出内置 feature。
+
+目前内置 feature 使用 `apt` 安装，因此预期 base image 属于 Debian/Ubuntu 系。
+
+## Proxy
+
 如果 Windows/macOS/Linux Docker host 上有本地 HTTP proxy，例如 3081：
 
 ```json
@@ -59,6 +94,23 @@ aktion status
 ```
 
 Aktion 会增加 `host-gateway` 映射，因此普通 Linux Docker Engine 也可以使用同一个 `host.docker.internal` 名称。
+
+## CLI
+
+```text
+aktion status
+aktion repos
+aktion runners
+aktion stats
+aktion doctor
+aktion features
+aktion logs [repo-id]
+aktion scalesets
+aktion cleanup
+aktion up
+aktion down
+aktion restart
+```
 
 ## 自举 CI
 
