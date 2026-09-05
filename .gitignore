@@ -1,0 +1,9 @@
+/config.json
+/compose.generated.yaml
+/secrets/*
+!/secrets/.gitkeep
+/dist/*
+!/dist/.gitkeep
+*.exe
+*.log
+.DS_Store
