@@ -1,0 +1,6 @@
+.git
+.github
+config.json
+compose.generated.yaml
+secrets
+*.md
