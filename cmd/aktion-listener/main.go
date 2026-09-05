@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/signal"
 
 	"github.com/actions/scaleset"
 	"github.com/actions/scaleset/listener"
-	"github.com/docker/docker/api/types/image"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -84,16 +82,8 @@ func runListener(ctx context.Context, c Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	logger.Info("Pulling runner image", slog.String("image", c.RunnerImage))
-	pull, err := dockerClient.ImagePull(ctx, c.RunnerImage, image.PullOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to pull runner image: %w", err)
-	}
-	if _, err := io.ReadAll(pull); err != nil {
-		return fmt.Errorf("failed to read image pull response: %w", err)
-	}
-	if err := pull.Close(); err != nil {
-		return fmt.Errorf("failed to close image pull: %w", err)
+	if err := ensureRunnerImage(ctx, dockerClient, c.RunnerImage, logger); err != nil {
+		return err
 	}
 
 	hostname, err := os.Hostname()
