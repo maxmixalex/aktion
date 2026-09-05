@@ -392,11 +392,14 @@ func extractFeatureArchive(data []byte) ([]FeatureFile, error) {
 		if err != nil {
 			return nil, err
 		}
-		name := strings.TrimPrefix(path.Clean("/"+hdr.Name), "/")
+		if path.IsAbs(hdr.Name) {
+			return nil, fmt.Errorf("unsafe archive path %q", hdr.Name)
+		}
+		name := path.Clean(hdr.Name)
 		if name == "" || name == "." {
 			continue
 		}
-		if strings.HasPrefix(name, "../") || path.IsAbs(hdr.Name) {
+		if name == ".." || strings.HasPrefix(name, "../") {
 			return nil, fmt.Errorf("unsafe archive path %q", hdr.Name)
 		}
 		switch hdr.Typeflag {
