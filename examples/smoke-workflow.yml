@@ -1,0 +1,40 @@
+name: Home scale-set smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: home-docker
+
+    steps:
+      - name: Environment
+        shell: bash
+        run: |
+          set -eux
+          echo "hostname=$(hostname)"
+          echo "user=$(whoami)"
+          uname -a
+          cat /etc/os-release
+
+      - name: Job summary
+        shell: bash
+        run: |
+          {
+            echo "## Home Docker Scale Set"
+            echo
+            echo "✅ `GITHUB_STEP_SUMMARY` works."
+            echo
+            echo "Runner hostname: `$(hostname)`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create artifact
+        shell: bash
+        run: |
+          printf 'hello from %s\n' "$(hostname)" > runner-test.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-runner-test
+          path: runner-test.txt
