@@ -39,6 +39,10 @@ func (s *Selections) UnmarshalJSON(data []byte) error {
 		}
 		if include {
 			out[ref] = options
+		} else {
+			// Preserve an explicit false until inheritance is resolved. Normal
+			// selection normalization drops disabled entries.
+			out[ref] = nil
 		}
 	}
 	*s = out
@@ -117,6 +121,9 @@ func NormalizeSelections(in Selections) (Selections, error) {
 	}
 	out := make(Selections, len(in))
 	for ref, opts := range in {
+		if opts == nil {
+			continue
+		}
 		normalized, err := NormalizeReference(ref)
 		if err != nil {
 			return nil, err

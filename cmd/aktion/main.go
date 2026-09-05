@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zyf722/aktion/internal/aktionconfig"
 	"github.com/zyf722/aktion/internal/runnerfeatures"
 )
 
@@ -68,6 +67,7 @@ type Repository struct {
 	ID             string                    `json:"id"`
 	URL            string                    `json:"url"`
 	Enabled        bool                      `json:"enabled"`
+	Extends        string                    `json:"extends,omitempty"`
 	InstallationID *int64                    `json:"installationId,omitempty"`
 	ScaleSetName   string                    `json:"scaleSetName,omitempty"`
 	MinRunners     *int                      `json:"minRunners,omitempty"`
@@ -91,8 +91,6 @@ type RepoResolved struct {
 	BaseImage          string
 	Features           []string
 	FeatureSelections  runnerfeatures.Selections
-	ProjectConfig      bool
-	ResolvedPresets    []string
 }
 
 type Loaded struct {
@@ -218,15 +216,6 @@ func run(args []string) int {
 		return fail(err)
 	}
 
-	// Commands which inspect or construct runner environments resolve the optional
-	// repository-owned .github/aktion.yml. Pure stop/log operations remain usable
-	// without GitHub connectivity.
-	if cmd != "down" && cmd != "logs" && cmd != "doctor" {
-		loaded, err = resolveProjectConfigs(loaded)
-		if err != nil {
-			return fail(err)
-		}
-	}
 
 	switch cmd {
 	case "render":
@@ -515,9 +504,16 @@ func loadConfig(root, configName string) (Loaded, error) {
 		if r.InstallationID != nil {
 			inst = *r.InstallationID
 		}
+		if r.Extends != "" && r.Extends != "defaults" {
+			return Loaded{}, fmt.Errorf("repository %q extends must be \"defaults\" when set", r.ID)
+		}
 		features := runnerfeatures.CloneSelections(defFeatures)
 		if r.RunnerFeatures != nil {
-			features, err = runnerfeatures.NormalizeSelections(r.RunnerFeatures)
+			if r.Extends == "defaults" {
+				features, err = extendRunnerFeatures(defFeatures, r.RunnerFeatures)
+			} else {
+				features, err = runnerfeatures.NormalizeSelections(r.RunnerFeatures)
+			}
 			if err != nil {
 				return Loaded{}, fmt.Errorf("repository %q runnerFeatures: %w", r.ID, err)
 			}
@@ -550,138 +546,46 @@ func loadConfig(root, configName string) (Loaded, error) {
 }
 
 
-type githubContentsFile struct {
-	Type     string `json:"type"`
-	Encoding string `json:"encoding"`
-	Content  string `json:"content"`
-}
 
-func resolveProjectConfigs(l Loaded) (Loaded, error) {
-	key, err := loadRSAKey(l.KeyPath)
+func extendRunnerFeatures(base, overlay runnerfeatures.Selections) (runnerfeatures.Selections, error) {
+	base, err := runnerfeatures.NormalizeSelections(base)
 	if err != nil {
-		return Loaded{}, err
+		return nil, err
 	}
-	appJWT, err := signAppJWT(l.Config.App.ClientID, key)
-	if err != nil {
-		return Loaded{}, err
+	out := runnerfeatures.CloneSelections(base)
+	if out == nil {
+		out = runnerfeatures.Selections{}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-
-	tokens := map[int64]string{}
-	presetResolver := &aktionconfig.Resolver{
-		Presets: aktionconfig.NewOCIPresetSource(runnerfeatures.DefaultCacheDir()),
-	}
-	for i := range l.Repos {
-		r := &l.Repos[i]
-		token := tokens[r.Installation]
-		if token == "" {
-			token, err = installationAccessToken(ctx, r.Installation, appJWT)
-			if err != nil {
-				return Loaded{}, fmt.Errorf("repository %q installation token: %w", r.ID, err)
-			}
-			tokens[r.Installation] = token
-		}
-		data, found, err := fetchRepositoryAktionConfig(ctx, *r, token)
+	seen := map[string]bool{}
+	for rawRef, options := range overlay {
+		ref, err := runnerfeatures.NormalizeReference(rawRef)
 		if err != nil {
-			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
+			return nil, err
 		}
-		if !found {
+		if seen[ref] {
+			return nil, fmt.Errorf("duplicate feature after normalization: %q", ref)
+		}
+		seen[ref] = true
+		if options == nil {
+			delete(out, ref)
 			continue
 		}
-		doc, err := aktionconfig.Parse(data)
+		normalized, err := runnerfeatures.NormalizeSelections(runnerfeatures.Selections{ref: options})
 		if err != nil {
-			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
+			return nil, err
 		}
-		resolved, err := presetResolver.Resolve(ctx, doc)
-		if err != nil {
-			return Loaded{}, fmt.Errorf("repository %q .github/aktion.yml: %w", r.ID, err)
-		}
-
-		// A repository-owned config has an explicit empty base. Only its extends
-		// chain and runner block form the project environment. Host-local repo
-		// settings are applied last as administrator overrides.
-		features := resolved.Features
-		if r.RunnerFeatures != nil {
-			features, err = aktionconfig.MergeSelections(features, r.RunnerFeatures)
-			if err != nil {
-				return Loaded{}, fmt.Errorf("repository %q local runnerFeatures override: %w", r.ID, err)
+		merged := runnerfeatures.Options{}
+		if existing, ok := out[ref]; ok {
+			for key, value := range existing {
+				merged[key] = value
 			}
 		}
-		baseImage := resolved.Image
-		if baseImage == "" {
-			baseImage = l.Config.Defaults.RunnerImage
+		for key, value := range normalized[ref] {
+			merged[key] = value
 		}
-		if r.RunnerImage != "" {
-			baseImage = r.RunnerImage
-		}
-		imageName, normalizedBase, err := runnerfeatures.ImageName(baseImage, features)
-		if err != nil {
-			return Loaded{}, fmt.Errorf("repository %q resolved runner config: %w", r.ID, err)
-		}
-		r.Image = imageName
-		r.BaseImage = normalizedBase
-		r.Features = runnerfeatures.SelectionKeys(features)
-		r.FeatureSelections = features
-		r.ProjectConfig = true
-		r.ResolvedPresets = append([]string(nil), resolved.Presets...)
+		out[ref] = merged
 	}
-	return l, nil
-}
-
-func fetchRepositoryAktionConfig(ctx context.Context, r RepoResolved, installationToken string) ([]byte, bool, error) {
-	owner, repo, err := parseGitHubRepoURL(r.URL)
-	if err != nil {
-		return nil, false, err
-	}
-	endpoint := fmt.Sprintf(
-		"https://api.github.com/repos/%s/%s/contents/.github/aktion.yml",
-		url.PathEscape(owner),
-		url.PathEscape(repo),
-	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, false, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+installationToken)
-	req.Header.Set("X-GitHub-Api-Version", githubAPIVersion)
-	req.Header.Set("User-Agent", "aktion-manager/"+version)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, false, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, false, nil
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var e struct {
-			Message string `json:"message"`
-		}
-		_ = json.Unmarshal(body, &e)
-		if e.Message == "" {
-			e.Message = strings.TrimSpace(string(body))
-		}
-		if resp.StatusCode == http.StatusForbidden {
-			e.Message += "; the Aktion GitHub App needs Contents: Read permission"
-		}
-		return nil, false, fmt.Errorf("GitHub API %s: %s", resp.Status, e.Message)
-	}
-	var payload githubContentsFile
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, false, err
-	}
-	if payload.Type != "file" || payload.Encoding != "base64" {
-		return nil, false, fmt.Errorf("unexpected GitHub Contents response type=%q encoding=%q", payload.Type, payload.Encoding)
-	}
-	encoded := strings.ReplaceAll(payload.Content, "\n", "")
-	data, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, false, fmt.Errorf("decode repository config: %w", err)
-	}
-	return data, true, nil
+	return out, nil
 }
 
 func cmdConfigResolve(l Loaded, id string) int {
@@ -692,18 +596,16 @@ func cmdConfigResolve(l Loaded, id string) int {
 		owner, repo, _ := parseGitHubRepoURL(r.URL)
 		payload := struct {
 			Repository string                    `json:"repository"`
-			ProjectConfig bool                    `json:"projectConfig"`
-			Presets    []string                  `json:"presets,omitempty"`
+			Extends    string                    `json:"extends,omitempty"`
 			BaseImage  string                    `json:"baseImage"`
 			Image      string                    `json:"image"`
 			Features   runnerfeatures.Selections `json:"features"`
 		}{
 			Repository: owner + "/" + repo,
-			ProjectConfig: r.ProjectConfig,
-			Presets: r.ResolvedPresets,
-			BaseImage: r.BaseImage,
-			Image: r.Image,
-			Features: r.FeatureSelections,
+			Extends:    r.Extends,
+			BaseImage:  r.BaseImage,
+			Image:      r.Image,
+			Features:   r.FeatureSelections,
 		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -1629,15 +1531,11 @@ func cmdDoctor(l Loaded) int {
 					} else {
 						perms, _ := inst["permissions"].(map[string]any)
 						admin, _ := perms["administration"].(string)
-						contents, _ := perms["contents"].(string)
 						detail := "reachable"
 						if admin != "" {
 							detail += ", administration=" + admin
 						}
-						if contents != "" {
-							detail += ", contents=" + contents
-						}
-						checks(admin == "write" && (contents == "read" || contents == "write"), "GitHub", fmt.Sprintf("Installation %d", r.Installation), detail)
+						checks(admin == "write", "GitHub", fmt.Sprintf("Installation %d", r.Installation), detail)
 					}
 					checkedInst[r.Installation] = true
 				}

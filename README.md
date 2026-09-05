@@ -16,7 +16,7 @@ Aktion is a lightweight GitHub Runner Scale Set manager for Docker hosts. It kee
 - stale scale-set reconciliation and cleanup
 - optional HTTP/HTTPS proxy forwarding into listener and job containers
 - OCI Dev Container Features for runner environments
-- repository-owned `.github/aktion.yml` with explicit OCI preset inheritance
+- host-controlled default → repository runner inheritance
 - no Kubernetes / ARC cluster required
 
 Aktion uses GitHub's standalone [`actions/scaleset`](https://github.com/actions/scaleset) client for the Runner Scale Set protocol.
@@ -92,24 +92,28 @@ Copy `config.example.json` to `config.json`, place the GitHub App PEM under `sec
 
 Repository values override `defaults`; omitted values inherit them.
 
-Projects may also own their runner environment in `.github/aktion.yml`. A project
-config has an explicit empty base and can extend versioned OCI presets:
+Runner environment policy stays entirely on the host. A repository that only
+needs a few additions can explicitly extend the host defaults:
 
-```yaml
-version: 1
-extends:
-  - ghcr.io/zyf722/aktion/recommended:1
-
-runner:
-  features:
-    builtin:glib: {}
-    builtin:gtk4: {}
+```json
+{
+  "id": "repo-b",
+  "url": "https://github.com/YOUR_NAME/YOUR_PRIVATE_REPO_B",
+  "enabled": true,
+  "extends": "defaults",
+  "runnerFeatures": {
+    "builtin:glib": {},
+    "builtin:gtk4": {},
+    "builtin:ncurses": {},
+    "builtin:lua54": {}
+  }
+}
 ```
 
-When a project config exists, its `extends` chain defines the base rather than
-silently inheriting Aktion's legacy default Feature set. Host-local
-`repositories[]` values remain final administrator overrides. See
-[`docs/project-config.md`](docs/project-config.md).
+`extends` is intentionally limited to `"defaults"`: Aktion has only two
+configuration levels, host defaults and per-repository overrides. There are no
+repository-owned Aktion configuration files and no arbitrary preset inheritance
+chain.
 
 ## Runner Features
 
@@ -156,7 +160,12 @@ Aktion keeps a small builtin catalog only where the official Dev Container colle
 
 The former builtin `network`, `archives`, and `python` Features were removed. The default environment now uses official `common-utils`, `python`, and `git-lfs` OCI Features instead.
 
-Omit `runnerFeatures` to inherit the default set; set it to `{}` to use `runnerImage` unchanged. `runnerImage` is the base image onto which Features are applied.
+At repository level, omitting `runnerFeatures` inherits the default set. When
+`runnerFeatures` is present without `extends`, it replaces the default set;
+an explicit `{}` therefore uses `runnerImage` unchanged. With
+`"extends": "defaults"`, repository Feature entries are merged onto the host
+defaults and option objects shallow-override matching Feature options.
+`runnerImage` is the base image onto which Features are applied.
 
 `aktion features` lists Aktion builtins and the default OCI Features. Any compatible public OCI Dev Container Feature may be referenced even if it is not listed there.
 
@@ -203,7 +212,6 @@ aktion restart
 For repository-scoped scale sets, install the App on each configured repository and grant:
 
 - **Repository administration: Read and write**
-- **Contents: Read** (for `.github/aktion.yml`)
 - Metadata read access (implicit)
 
 No webhook is required.

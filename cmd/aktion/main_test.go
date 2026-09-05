@@ -216,7 +216,7 @@ func TestGitHubLinkTargets(t *testing.T) {
 	}
 }
 
-func TestRunnerFeaturesInheritanceAndExplicitDisable(t *testing.T) {
+func TestRunnerFeaturesHostSideExtendsDefaults(t *testing.T) {
 	dir := t.TempDir()
 	key := filepath.Join(dir, "app.pem")
 	if err := os.WriteFile(key, []byte("placeholder"), 0600); err != nil {
@@ -236,7 +236,7 @@ func TestRunnerFeaturesInheritanceAndExplicitDisable(t *testing.T) {
 		"  \"repositories\": [\n" +
 		"    {\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true},\n" +
 		"    {\"id\":\"repo-b\",\"url\":\"https://github.com/example/repo-b\",\"enabled\":true,\"runnerFeatures\":{}},\n" +
-		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"runnerFeatures\":{\"builtin:gtk4\":{}}}\n" +
+		"    {\"id\":\"repo-c\",\"url\":\"https://github.com/example/repo-c\",\"enabled\":true,\"extends\":\"defaults\",\"runnerFeatures\":{\"builtin:build\":false,\"builtin:gtk4\":{},\"ghcr.io/devcontainers/features/python:1\":{\"version\":\"3.13\"}}}\n" +
 		"  ]\n" +
 		"}"
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
@@ -254,11 +254,35 @@ func TestRunnerFeaturesInheritanceAndExplicitDisable(t *testing.T) {
 		t.Fatalf("repo-a features=%q", got)
 	}
 	if got := byID["repo-b"]; len(got.Features) != 0 || got.Image != "ghcr.io/actions/actions-runner:latest" {
-		t.Fatalf("repo-b should use unmodified base image: features=%v image=%q", got.Features, got.Image)
+		t.Fatalf("repo-b should replace defaults with the unmodified base image: features=%v image=%q", got.Features, got.Image)
 	}
-	gotC := strings.Join(byID["repo-c"].Features, ",")
-	if gotC != "builtin:gtk4" {
-		t.Fatalf("repo-c configured features=%q", gotC)
+	gotC := byID["repo-c"]
+	featuresC := strings.Join(gotC.Features, ",")
+	if strings.Contains(featuresC, "builtin:build") || !strings.Contains(featuresC, "builtin:gtk4") || !strings.Contains(featuresC, "ghcr.io/devcontainers/features/python:1") {
+		t.Fatalf("repo-c extended features=%q", featuresC)
+	}
+	python := gotC.FeatureSelections["ghcr.io/devcontainers/features/python:1"]
+	if python["version"] != "3.13" || python["installTools"] != false {
+		t.Fatalf("repo-c python options=%#v", python)
+	}
+}
+
+func TestRepositoryExtendsRejectsUnknownBase(t *testing.T) {
+	dir := t.TempDir()
+	key := filepath.Join(dir, "app.pem")
+	if err := os.WriteFile(key, []byte("placeholder"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := "{\n" +
+		"  \"app\": {\"clientId\":\"Iv123\",\"installationId\":123,\"privateKeyFile\":\"./app.pem\"},\n" +
+		"  \"defaults\": {\"scaleSetName\":\"home-docker\",\"minRunners\":0,\"maxRunners\":1},\n" +
+		"  \"repositories\": [{\"id\":\"repo-a\",\"url\":\"https://github.com/example/repo-a\",\"enabled\":true,\"extends\":\"anything\"}]\n" +
+		"}"
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadConfig(dir, "config.json"); err == nil || !strings.Contains(err.Error(), "extends must be \"defaults\"") {
+		t.Fatalf("expected invalid extends error, got %v", err)
 	}
 }
 

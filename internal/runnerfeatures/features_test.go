@@ -53,8 +53,15 @@ func TestSelectionsDecodeDevContainerStyleValues(t *testing.T) {
 	if _, ok := selections["ghcr.io/devcontainers/features/rust:1"]; !ok {
 		t.Fatal("true feature should be included")
 	}
-	if _, ok := selections["ghcr.io/devcontainers/features/php:1"]; ok {
-		t.Fatal("false feature should be omitted")
+	if disabled, ok := selections["ghcr.io/devcontainers/features/php:1"]; !ok || disabled != nil {
+		t.Fatalf("false feature should be preserved as a disabled marker: %#v", disabled)
+	}
+	normalized, err := NormalizeSelections(selections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := normalized["ghcr.io/devcontainers/features/php:1"]; ok {
+		t.Fatal("false feature should be omitted after normalization")
 	}
 }
 

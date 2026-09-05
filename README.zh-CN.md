@@ -16,7 +16,7 @@ Aktion 是一个面向 Docker host 的轻量 GitHub Runner Scale Set manager：�
 - stale scale set 自动复用/reconcile 与显式 `cleanup`
 - HTTP/HTTPS proxy 透传到 listener 和 runner
 - 直接消费 OCI Dev Container Features 构建 runner 环境
-- 仓库级 `.github/aktion.yml`，显式继承版本化 OCI preset
+- 完全由 host 控制的 defaults → repository runner 继承
 - 不需要 Kubernetes / ARC cluster
 
 Aktion 底层使用 GitHub 官方 [`actions/scaleset`](https://github.com/actions/scaleset) 实现 Scale Set 协议。
@@ -48,30 +48,29 @@ aktion up
 aktion status
 ```
 
-## 项目级 `.github/aktion.yml`
+## Host 侧 runner 继承
 
-仓库可以把 runner 环境需求随代码一起版本化。例如：
+runner 环境完全由 host 的 `config.json` 决定。某个仓库只需要在默认环境上
+追加少量能力时，可以显式继承 `defaults`：
 
-```yaml
-version: 1
-
-extends:
-  - ghcr.io/zyf722/aktion/recommended:1
-
-runner:
-  features:
-    builtin:glib: {}
-    builtin:gtk4: {}
-    builtin:ncurses: {}
-    builtin:lua54: {}
+```json
+{
+  "id": "hpclang",
+  "url": "https://github.com/zyf722/hpclang",
+  "enabled": true,
+  "extends": "defaults",
+  "runnerFeatures": {
+    "builtin:glib": {},
+    "builtin:gtk4": {},
+    "builtin:ncurses": {},
+    "builtin:lua54": {}
+  }
+}
 ```
 
-只要项目文件存在，它就从**空环境**开始，base 完全由 `extends` 明确决定，
-不会偷偷继承 Aktion 的旧默认 Feature 集合。本机 `config.json` 中
-`repositories[]` 的显式设置仍作为管理员最终覆盖。
-
-详细 schema、merge 顺序和 OCI artifact 格式见
-[`docs/project-config.zh-CN.md`](docs/project-config.zh-CN.md)。
+`extends` 目前刻意只允许 `"defaults"`。Aktion 只有两层配置：
+host defaults 和 per-repository override，不支持仓库自己的 Aktion 配置文件，
+也不支持任意多层 preset 继承。
 
 ## Runner Features
 
@@ -155,7 +154,11 @@ ghcr.io/devcontainers/features/git-lfs:1
 
 默认配置会关闭 common-utils 的 zsh/Oh My Zsh/package upgrade 等交互式开发容器倾向设置，并让 Python 使用 `os-provided` 且不额外安装一大批编辑器/lint 工具，使 runner image 保持相对克制。
 
-省略 `runnerFeatures` 表示继承 defaults；显式 `{}` 表示完全不加 Feature，直接使用 `runnerImage`。后者是 Feature 链的 base image。
+在 repository 层，省略 `runnerFeatures` 表示直接继承 defaults。
+如果写了 `runnerFeatures` 但没有 `extends`，仍保持原来的“整段替换”语义；
+因此显式 `{}` 表示完全不加 Feature，直接使用 `runnerImage`。
+如果同时写 `"extends": "defaults"`，则 repository 的 Feature 会增量合并到
+host defaults 上；同一个 Feature 的 options 做浅层覆盖。
 
 `aktion features` 会列出 Aktion builtin 和默认 OCI Feature，但并不是 allow-list；任意兼容的 public OCI Dev Container Feature URI 都可以直接写进配置。
 
@@ -222,7 +225,6 @@ runs-on: home-docker
 仓库级 scale set 需要把 GitHub App 安装到对应仓库，并授予：
 
 - **Repository administration: Read and write**
-- **Contents: Read**（用于读取 default branch 上的 `.github/aktion.yml`）
 - Metadata: Read（隐含）
 
 无需 webhook。
