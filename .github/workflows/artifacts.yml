@@ -42,7 +42,7 @@ jobs:
         shell: bash
         env:
           AKTION_VERSION: ${{ github.ref_name }}
-        run: ./scripts/build-artifacts.sh dist
+        run: bash ./scripts/build-artifacts.sh dist
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
