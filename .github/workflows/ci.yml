@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,17 +29,17 @@ jobs:
       - name: Resolve modules
         run: go mod tidy
 
-      - name: Test
-        run: go test ./...
-
-      - name: Vet
-        run: go vet ./...
-
       - name: Actionlint
         shell: bash
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           "$(go env GOPATH)/bin/actionlint"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Vet
+        run: go vet ./...
 
       - name: Build manager
         run: go build -o dist/aktion ./cmd/aktion
