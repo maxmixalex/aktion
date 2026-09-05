@@ -75,7 +75,7 @@ runner 环境仍然**完全由 host 的 `config.json` 决定**。Aktion 不读�
     "ghcr.io/YOUR_NAME/aktion-presets/native-extra:1"
   ],
   "runnerFeatures": {
-    "builtin:gtk4": {}
+    "builtin:svn": {}
   }
 }
 ```
@@ -287,7 +287,7 @@ runs-on: home-docker
 
 ### 默认命令基线
 
-默认 runner 会在专门的 OCI 验证 CI 中实际构建镜像，并逐项检查以下命令：
+默认 runner 当前以以下 GitHub-hosted 兼容命令集作为基线：
 
 ```text
 git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout

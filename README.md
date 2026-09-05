@@ -118,7 +118,7 @@ The host may also reference real OCI runner presets:
     "ghcr.io/YOUR_NAME/aktion-presets/native-extra:1"
   ],
   "runnerFeatures": {
-    "builtin:gtk4": {}
+    "builtin:svn": {}
   }
 }
 ```
@@ -283,10 +283,10 @@ Aktion is early-stage and built on the standalone Runner Scale Set client, which
 
 ### Default command baseline
 
-The default runner image is continuously smoke-tested for this GitHub-compatible command baseline:
+The default runner image currently targets this GitHub-compatible command baseline:
 
 ```text
 git curl wget tar xz unzip python3 cc gcc g++ make pkg-config clang file cmake sha256sum find timeout
 ```
 
-`builtin:clang` exists because the minimal `actions-runner` container does not provide Clang by itself, while GitHub-hosted Ubuntu runners do. The dedicated OCI verification workflow builds the effective default runner image and checks every command above with `command -v`.
+`builtin:clang` exists because the minimal `actions-runner` container does not provide Clang by itself, while GitHub-hosted Ubuntu runners do.
