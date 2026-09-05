@@ -249,6 +249,26 @@ func TestOfficialOCIDefaults(t *testing.T) {
 	if !strings.Contains(plan.Dockerfile, "INSTALLTOOLS='false'") {
 		t.Fatalf("official Python options were not mapped into Dockerfile:\n%s", plan.Dockerfile)
 	}
+	runtimePlan, err := resolver.ResolvePlan(ctx, DefaultBaseImage, Selections{
+		"ghcr.io/devcontainers/features/go:1": {},
+		"ghcr.io/devcontainers/features/rust:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:4": {
+			"version": "latest",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !runtimePlan.Runtime.Init || !runtimePlan.Runtime.Privileged {
+		t.Fatalf("official runtime flags not resolved: %#v", runtimePlan.Runtime)
+	}
+	if !contains(runtimePlan.Runtime.CapAdd, "SYS_PTRACE") || !contains(runtimePlan.Runtime.SecurityOpt, "seccomp=unconfined") {
+		t.Fatalf("official Go/Rust runtime metadata missing: %#v", runtimePlan.Runtime)
+	}
+	if len(runtimePlan.Runtime.Mounts) < 2 || !contains(runtimePlan.Runtime.Entrypoints, "/usr/local/share/docker-init.sh") {
+		t.Fatalf("official Docker-in-Docker runtime metadata missing: %#v", runtimePlan.Runtime)
+	}
+
 	if os.Getenv("AKTION_TEST_DOCKER") != "1" {
 		return
 	}
