@@ -81,4 +81,4 @@ runs-on: build-host
 
 然后运行 `aktion restart`。被禁用的项不会参与配置解析或 listener 启动。配置中必须至少保留一个已启用的 repository，否则 Aktion 会拒绝启动。
 
-如果你是在处理 GitHub 侧遗留的旧 scale set，而不是普通停用，请使用[清理 stale scale set](../operations.md#清理-stale-scale-set)，不要直接编辑生成的 Compose 文件。
+如果你是在处理 GitHub 侧遗留的旧 scale set，而不是普通停用，请使用[清理 stale scale set](../operations.md)，不要直接编辑生成的 Compose 文件。
