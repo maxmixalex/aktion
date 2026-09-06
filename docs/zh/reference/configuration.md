@@ -98,7 +98,7 @@ Feature key 可以是 `builtin:<id>`，也可以是 OCI Dev Container Feature UR
 - `true`：启用 Feature，并使用发布者提供的默认 options；
 - `false`：从继承结果中删除该 Feature。
 
-option value 只能是 string 或 boolean。同一个 Feature 在多个位置出现时，options 会进行浅层合并；后出现的同名 option 会覆盖前面的值。
+option value 只能是 string 或 boolean。同一个 Feature 在多个位置出现时，options 会浅层合并；后出现的同名 option 会覆盖前面的值。
 
 ### `defaults.extends`
 
