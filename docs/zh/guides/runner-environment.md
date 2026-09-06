@@ -64,7 +64,7 @@ Feature 的值支持以下形式：
 }
 ```
 
-同一个 Feature 在多处配置中出现时，options 会进行浅层合并；后出现的同名 option 会覆盖前面的值。
+同一个 Feature 在多处配置中出现时，options 会浅层合并；后出现的同名 option 会覆盖前面的值。
 
 ## 从基础 runner image 开始
 
@@ -79,7 +79,7 @@ Feature 的值支持以下形式：
 }
 ```
 
-这表示该仓库既不继承 defaults，也不使用 Aktion 的默认 Feature。如果没有再设置 `runnerFeatures`，最终会直接使用基础 runner image。
+这表示该仓库既不继承 defaults，也不使用 Aktion 的默认 Feature。如果没有再设置 `runnerFeatures`，最终会使用基础 runner image。
 
 如果需要先继承 defaults，再叠加其他 preset，请显式加入字面值 `"defaults"`：
 
@@ -91,7 +91,7 @@ Feature 的值支持以下形式：
 ```
 
 !!! important "显式设置 extends 会改变继承关系"
-    仓库未设置 `extends` 时，会自动继承 defaults。只要 `extends` 出现，Aktion 就只按数组中列出的来源进行组合。修改后运行 `aktion config resolve <repo-id>`，检查最终的 `baseImage`、`image` 和 `features`。
+    仓库未设置 `extends` 时，会自动继承 defaults。只要 `extends` 出现，Aktion 就只按数组中列出的来源组合。修改后运行 `aktion config resolve <repo-id>`，检查最终的 `baseImage`、`image` 和 `features`。
 
 ## 仅由主机配置的 OCI runner preset
 
@@ -118,7 +118,7 @@ Aktion 支持 Feature options、`dependsOn`、`installsAfter` 和 `containerEnv`
 
 Dev Container lifecycle hook（例如 `postCreateCommand`）不会执行，因为 GitHub 作业的 workspace 在 runner 启动后才创建。Feature 声明 lifecycle hook 时，Aktion 会显示 warning。
 
-当前 OCI 客户端支持匿名 pull 和 Bearer token 流程，但没有私有 registry 凭据的配置入口。因此，需要私有认证的 Feature 或 preset registry 不能直接使用。
+当前 OCI 客户端支持匿名 pull 和 Bearer token 流程，但没有私有 registry 凭据的配置入口。因此，需要私有认证的 Feature 或 preset registry 无法使用。
 
 ## 将项目专用依赖保留在工作流中
 
