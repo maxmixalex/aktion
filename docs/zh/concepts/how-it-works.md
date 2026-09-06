@@ -40,7 +40,7 @@ listener 是持续运行的轻量容器，执行作业的 runner 则按需创建
 
 ## GitHub App 认证
 
-Aktion 主程序使用配置的 GitHub App 私钥进行认证，并检查 installation 与仓库。listener 则使用相应 installation 的身份连接 Runner Scale Set 服务。
+Aktion 主程序使用配置的 GitHub App 私钥完成认证，并检查 installation 与仓库。listener 则使用相应 installation 的身份连接 Runner Scale Set 服务。
 
 该 installation 必须拥有仓库的 **Administration: Read and write** 权限。Aktion 不支持使用 PAT 代替 GitHub App。
 
@@ -51,4 +51,4 @@ listener 通过 Docker Engine 创建临时 runner 容器，因此主机必须提
 !!! warning "仅将可信工作流接入自托管 runner"
     自托管 runner 会执行仓库工作流中的任意命令，并可以访问授予该 runner 的网络和运行环境。不要将不受信任的公开 pull request 或陌生仓库接入可访问敏感资源的主机。临时 runner 可以减少作业之间残留的状态，但不会自动隔离不可信代码带来的风险。
 
-如需先完成第一次运行，可直接按照[快速开始](../getting-started.md)操作。
+如需先完成第一次运行，可按照[快速开始](../getting-started.md)操作。
