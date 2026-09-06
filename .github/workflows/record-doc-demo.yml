@@ -1,0 +1,52 @@
+name: Record documentation demo
+
+on:
+  push:
+    branches:
+      - docs/asciinema-logo-fixes
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.25.3'
+          cache: true
+
+      - name: Build Aktion
+        run: go build -o aktion ./cmd/aktion
+
+      - name: Install asciinema
+        run: |
+          curl -fsSL             https://github.com/asciinema/asciinema/releases/download/v3.2.1/asciinema-x86_64-unknown-linux-gnu             -o /usr/local/bin/asciinema
+          chmod +x /usr/local/bin/asciinema
+          asciinema --version
+
+      - name: Record CLI tour
+        run: |
+          cat > demo.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -e
+          printf '\033[1;36m$ aktion features\033[0m\n'
+          sleep 0.4
+          ./aktion features
+          sleep 1
+          printf '\n\033[1;36m$ aktion help\033[0m\n'
+          sleep 0.4
+          ./aktion help
+          sleep 1
+          EOF
+          chmod +x demo.sh
+          asciinema rec --headless -i 1.5 -c ./demo.sh aktion-demo.cast
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aktion-asciinema-demo
+          path: aktion-demo.cast
+          retention-days: 1
