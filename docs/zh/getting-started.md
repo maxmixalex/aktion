@@ -4,7 +4,7 @@
 
 ## 准备运行目录
 
-主机需要 Docker Engine 或 Docker Desktop，并且必须支持 **Linux 容器**；同时需要 Docker Compose v2，即可使用 `docker compose` 命令。Aktion 主程序支持 Windows、Linux 和 macOS，listener 与 runner 当前为 Linux 容器。
+主机需要 [Docker Engine](https://docs.docker.com/engine/) 或 [Docker Desktop](https://docs.docker.com/desktop/)，并且必须支持 **Linux 容器**；同时需要 [Docker Compose v2](https://docs.docker.com/compose/)，即可使用 `docker compose` 命令。Aktion 主程序支持 Windows、Linux 和 macOS，listener 与 runner 当前为 Linux 容器。
 
 可运行的 Aktion 目录至少包含：
 
@@ -25,27 +25,18 @@ GitHub App 的 PEM 不应包含在分发包中，也不应提交到版本控制�
 
 先检查 Docker：
 
-=== "Windows"
-
-    ```powershell
-    docker version
-    docker compose version
-    ```
-
-=== "Linux / macOS"
-
-    ```bash
-    docker version
-    docker compose version
-    ```
+```text
+docker version
+docker compose version
+```
 
 两条命令都应成功。如果 Docker Desktop 当前使用 Windows 容器，请先切换到 Linux 容器。
 
 ## 创建 GitHub App
 
-Aktion 仅支持 GitHub App 认证，不支持 PAT。
+Aktion 仅支持 [GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app) 认证，不支持 PAT。
 
-1. 创建 GitHub App，将仓库的 **Administration** 权限设为 **Read and write**。
+1. 创建 GitHub App，将仓库的 **Administration** 权限设为 **Read and write**。GitHub 的 [App 权限说明](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app) 介绍了权限的作用方式。
 2. Aktion 不需要 webhook。若该 App 仅用于 Aktion，可关闭 webhook。
 3. 将 App 安装到需要使用这台 runner 主机的仓库。
 4. 记录 App 的 **Client ID** 和数字形式的 **Installation ID**。
@@ -86,13 +77,13 @@ Aktion 仅支持 GitHub App 认证，不支持 PAT。
 
 ## 启动前验证
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ```powershell
     .\aktion.exe doctor
     ```
 
-=== "Linux / macOS"
+=== ":fontawesome-brands-apple: macOS / :fontawesome-brands-linux: Linux"
 
     ```bash
     ./aktion doctor
@@ -104,14 +95,14 @@ Aktion 仅支持 GitHub App 认证，不支持 PAT。
 
 ## 启动 listener
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ```powershell
     .\aktion.exe up
     .\aktion.exe status
     ```
 
-=== "Linux / macOS"
+=== ":fontawesome-brands-apple: macOS / :fontawesome-brands-linux: Linux"
 
     ```bash
     ./aktion up

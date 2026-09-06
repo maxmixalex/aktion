@@ -1,6 +1,6 @@
 # 配置 runner 环境
 
-runner 环境由 Aktion 主机配置，仓库不能通过工作流重新定义 Aktion 使用的基础环境。可以组合 Aktion 内置 Feature、公开的 OCI Dev Container Feature，以及仅由主机配置的 OCI runner preset。只服务于单个项目的依赖通常更适合在该项目的工作流中安装。
+runner 环境由 Aktion 主机配置，仓库不能通过工作流重新定义 Aktion 使用的基础环境。可以组合 Aktion 内置 Feature、公开的 [Dev Container Feature](https://containers.dev/features)，以及通过 [OCI](https://opencontainers.org/about/overview/) registry 分发、仅由主机配置的 runner preset。只服务于单个项目的依赖通常更适合在该项目的工作流中安装。
 
 ## 默认环境
 
@@ -20,7 +20,7 @@ Aktion 随后加入以下默认 Feature：
 | `ghcr.io/devcontainers/features/python:1` | 使用基础 image 中已有的 Python，不额外安装工具 |
 | `ghcr.io/devcontainers/features/git-lfs:1` | 提供 Git LFS，并关闭自动 pull |
 
-该环境适合常见的源码检出、脚本和 C/C++ 构建，但它不等同于 GitHub-hosted Ubuntu VM 的完整预装软件环境。
+该环境适合常见的源码检出、脚本和 C/C++ 构建，但它不等同于 [GitHub-hosted runner](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) 的完整预装软件环境。
 
 运行：
 

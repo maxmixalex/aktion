@@ -4,7 +4,7 @@ This guide starts with a Docker host where Aktion is not running and ends with a
 
 ## Prepare the runtime directory
 
-The host needs Docker Engine or Docker Desktop capable of running **Linux containers**, plus Docker Compose v2 through the `docker compose` command. The manager supports Windows, Linux, and macOS, while the listener and runner are currently Linux containers.
+The host needs [Docker Engine](https://docs.docker.com/engine/) or [Docker Desktop](https://docs.docker.com/desktop/) capable of running **Linux containers**, plus [Docker Compose v2](https://docs.docker.com/compose/) through the `docker compose` command. The manager supports Windows, Linux, and macOS, while the listener and runner are currently Linux containers.
 
 A runnable Aktion directory contains at least:
 
@@ -25,27 +25,18 @@ The GitHub App PEM should not be included in a distribution archive or committed
 
 Check Docker first:
 
-=== "Windows"
-
-    ```powershell
-    docker version
-    docker compose version
-    ```
-
-=== "Linux / macOS"
-
-    ```bash
-    docker version
-    docker compose version
-    ```
+```text
+docker version
+docker compose version
+```
 
 Both commands should succeed. If Docker Desktop is using Windows containers, switch it to Linux containers first.
 
 ## Create a GitHub App
 
-Aktion uses GitHub App authentication only; there is no PAT mode.
+Aktion uses [GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app) authentication only; there is no PAT mode.
 
-1. Create a GitHub App and set the repository **Administration** permission to **Read and write**.
+1. Create a GitHub App and set the repository **Administration** permission to **Read and write**. GitHub's [permissions guide](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app) explains how App permissions work.
 2. Aktion does not need webhooks. If this App exists only for Aktion, webhooks can be disabled.
 3. Install the App on the repository that should use this runner host.
 4. Record the App **Client ID** and the numeric **Installation ID**.
@@ -86,13 +77,13 @@ Place the PEM at `./secrets/github-app.pem`. Relative paths are resolved from Ak
 
 ## Validate before starting
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ```powershell
     .\aktion.exe doctor
     ```
 
-=== "Linux / macOS"
+=== ":fontawesome-brands-apple: macOS / :fontawesome-brands-linux: Linux"
 
     ```bash
     ./aktion doctor
@@ -104,14 +95,14 @@ Fix failed checks first. A successful run ends with **All systems operational**.
 
 ## Start the listener
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ```powershell
     .\aktion.exe up
     .\aktion.exe status
     ```
 
-=== "Linux / macOS"
+=== ":fontawesome-brands-apple: macOS / :fontawesome-brands-linux: Linux"
 
     ```bash
     ./aktion up

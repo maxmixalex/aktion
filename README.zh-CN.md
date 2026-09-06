@@ -1,6 +1,10 @@
-# Aktion
+<p align="center">
+  <img src="docs/zh/assets/aktion.svg" alt="Aktion logo" width="112">
+</p>
 
-**不用 Kubernetes 的自托管 GitHub Actions。**
+<h1 align="center">Aktion</h1>
+
+<p align="center"><strong>Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.</strong></p>
 
 Aktion 在普通 Docker host 上运行 repository-scoped GitHub Runner Scale Set listener；GitHub 分配 job 后创建临时 Linux runner container，job 完成后销毁。
 
