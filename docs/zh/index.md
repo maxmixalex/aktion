@@ -1,45 +1,45 @@
 # Aktion
 
-**不用 Kubernetes 的自托管 GitHub Actions runner。**
+**无需 Kubernetes 的自托管 GitHub Actions runner。**
 
-Aktion 让一台普通的 Docker 主机同时为多个 GitHub repository 提供按需 runner。每个已启用的 repository 都有自己的 GitHub Runner Scale Set listener；有 job 到达时，Aktion 创建临时 Linux runner container，job 完成后销毁。你得到的是 GitHub Actions 原生的队列和 workflow 体验，而不需要为了弹性 runner 部署 Kubernetes 或 Actions Runner Controller。
+Aktion 可让一台普通的 Docker 主机按需为多个 GitHub 仓库提供 runner。每个启用的仓库都有独立的 GitHub Runner Scale Set listener。GitHub 分配作业后，Aktion 会创建临时 Linux runner 容器，并在作业结束后将其删除。这样既保留 GitHub Actions 原有的工作流和排队机制，也无需仅为弹性 runner 部署 Kubernetes 或 Actions Runner Controller。
 
-Aktion 适合希望自己掌控 runner 主机和软件环境、同时又不想长期维护一批常驻 runner 的个人或小型团队。Manager 可以运行在 Windows、Linux 和 macOS；listener 与实际执行 job 的 runner 当前使用 Linux container。
+Aktion 适合希望自行管理 runner 主机和软件环境，又不需要长期维护一组常驻 runner 的个人和小型团队。Aktion 主程序可运行在 Windows、Linux 和 macOS 上；listener 与执行作业的 runner 当前运行在 Linux 容器中。
 
-!!! note "它不是 GitHub-hosted Ubuntu 的复制品"
-    默认 runner 基于 `ghcr.io/actions/actions-runner:latest`，再叠加 Aktion 的默认 Features。它不会自动拥有 GitHub-hosted `ubuntu-24.04` 镜像中的全部预装工具。项目特有的依赖仍应在 workflow 中安装，或明确加入你控制的 runner 环境。
+!!! note "默认环境不同于 GitHub-hosted Ubuntu"
+    默认 runner 以 `ghcr.io/actions/actions-runner:latest` 为基础，并加入 Aktion 的默认 Feature。它不会自动包含 GitHub-hosted `ubuntu-24.04` 预装的全部工具。项目专用依赖应由工作流安装，或者明确加入由主机管理的 runner 环境。
 
-## 从这里开始
+## 开始使用
 
-第一次使用时，按下面的顺序完成即可：
+首次部署按以下顺序完成：
 
-1. 准备能运行 Linux container 的 Docker Engine 或 Docker Desktop，以及 Docker Compose v2。
-2. 创建并安装一个 GitHub App，给目标 repository **Administration: Read and write** 权限。
-3. 在 `config.json` 中填入 App 凭据和要接入的 repository。
-4. 运行 `aktion doctor`，先把配置、Docker 和 GitHub 连接全部检查通过。
-5. 运行 `aktion up`，然后把 workflow 的 `runs-on` 指向你的 scale set 名称。
+1. 准备支持 Linux 容器的 Docker Engine 或 Docker Desktop，并安装 Docker Compose v2。
+2. 创建 GitHub App，将目标仓库的 **Administration** 权限设为 **Read and write**，然后安装该 App。
+3. 在 `config.json` 中填写 App 凭据和仓库信息。
+4. 运行 `aktion doctor`。启动 listener 前，先修复配置、Docker 或 GitHub 连接问题。
+5. 运行 `aktion up`，再将工作流的 `runs-on` 设置为已配置的 scale set 名称。
 
-[开始第一次部署 →](getting-started.md)
+[运行第一个作业 →](getting-started.md)
 
-## 你通常会做什么
+## 常见任务
 
-如果 Aktion 已经运行起来，最常见的工作集中在四件事上：增加 repository、控制每个 repository 的并发、调整 runner 环境，以及查看运行状态。对应的指南不会要求你理解内部 Go package 或 listener 实现。
+Aktion 启动后，常见管理工作主要包括添加仓库、设置各仓库的并发上限、调整 runner 环境，以及检查运行状态。
 
-- [添加或停用 repository](guides/repositories.md)
-- [设置 runner 数量与并发](guides/capacity.md)
-- [定制 runner 环境](guides/runner-environment.md)
-- [通过 HTTP/HTTPS proxy 访问外部服务](guides/proxy.md)
+- [添加或停用仓库](guides/repositories.md)
+- [配置 runner 数量和并发](guides/capacity.md)
+- [配置 runner 环境](guides/runner-environment.md)
+- [配置 HTTP/HTTPS 代理](guides/proxy.md)
 
-日常查看和维护命令集中在[运行与维护](operations.md)，所有 `config.json` 字段和 CLI 命令则分别放在[配置参考](reference/configuration.md)与[CLI 参考](reference/cli.md)。
+日常命令见[运行和维护](operations.md)。`config.json` 的所有字段和 CLI 命令分别见[配置参考](reference/configuration.md)和 [CLI 参考](reference/cli.md)。
 
-## Aktion 负责什么
+## 职责范围
 
-| Aktion 负责 | 仍由你负责 |
+| Aktion 负责 | 主机管理员负责 |
 | --- | --- |
-| 为每个 repository 维护 scale set listener | Docker 主机本身的可用性和容量 |
-| 根据 GitHub 分配的 job 创建、销毁 runner | workflow 中项目专用的依赖安装 |
-| 构建 host 控制的 runner image | GitHub App 的创建、安装和 private key 保管 |
-| 限制每个 repository 的 runner 数量 | 决定哪些 repository 可以使用这台主机 |
-| 展示 listener、runner、job 和 Docker 状态 | 对不受信任 workflow 采用合适的隔离策略 |
+| 为每个仓库维护一个 scale set listener | 保证 Docker 主机可用，并规划主机容量 |
+| 根据 GitHub 分配的作业创建和删除 runner | 在工作流中安装项目专用依赖 |
+| 构建由主机配置的 runner image | 创建、安装并妥善保管 GitHub App 私钥 |
+| 限制每个仓库的 runner 数量 | 决定哪些仓库可以使用这台主机 |
+| 显示 listener、runner、作业和 Docker 状态 | 为不受信任的工作流选择适当的隔离方式 |
 
-想先理解 listener、runner 和 repository 之间的关系，可以阅读[Aktion 如何工作](concepts/how-it-works.md)。
+要了解仓库、listener 和 runner 之间的关系，请参阅 [Aktion 的工作方式](concepts/how-it-works.md)。

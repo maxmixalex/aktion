@@ -1,6 +1,6 @@
-# 运行与维护
+# 运行和维护 Aktion
 
-日常使用 Aktion 不需要直接操作生成的 Compose 文件。配置放在 `config.json`，启动、状态、日志和修复都通过 `aktion` 命令完成。
+日常管理 Aktion 不需要编辑生成的 Compose 文件。期望的运行配置保存在 `config.json` 中；启动、状态检查、日志和故障恢复均通过 `aktion` 命令完成。
 
 ## 启动、停止和重启
 
@@ -10,11 +10,11 @@ aktion down
 aktion restart
 ```
 
-`up` 会重新解析配置和 runner Features，按需要构建本地 runner image，然后启动所有已启用 repository 的 listener。
+`up` 会解析配置和 runner Feature，按需构建本地 runner image，然后为所有已启用的仓库启动 listener。
 
-`down` 停止并移除 listener stack。它不会删除你的 `config.json`、private key 或已构建的 Docker image。
+`down` 会停止并删除 listener，不会删除 `config.json`、私钥或已经构建的 Docker image。
 
-`restart` 等价于重新生成配置后先停止、再启动 listener。新增 repository、调整容量、Feature、proxy 或其他运行配置后，用它让修改生效。
+`restart` 会重新生成配置，停止当前 listener，准备 runner image，再重新启动。修改仓库、容量、Feature、代理或其他运行配置后，应执行该命令。
 
 ## 查看整体状态
 
@@ -22,17 +22,17 @@ aktion restart
 aktion status
 ```
 
-无参数运行 `aktion` 也会进入 `status`。页面会显示：
+不带命令运行 `aktion` 时也会执行 `status`。状态页包含：
 
-- 健康 listener 数量；
-- 当前 ephemeral runner 数量；
-- 正在运行的 job；
-- GitHub 已分配但还在等待 runner 的 job；
-- 每个 repository 的 listener 状态和 runner 使用情况。
+- 健康的 listener 数量；
+- 当前临时 runner 数量；
+- 正在执行的作业；
+- GitHub 已分配但仍在等待 runner 的作业；
+- 各仓库的 listener 和 runner 状态。
 
-如果 listener 不是 `RUNNING`，状态页会尽量给出最近的可用错误提示。需要完整上下文时再看日志。
+如果 listener 不是 `RUNNING`，状态页会尽量显示近期相关错误。需要完整上下文时，再查看日志。
 
-## 查看 repository、runner 和资源
+## 查看仓库、runner 和资源使用情况
 
 ```text
 aktion repos
@@ -40,11 +40,11 @@ aktion runners
 aktion stats
 ```
 
-`repos` 适合快速确认当前实际启用了哪些 repository 以及它们解析出的容量。被设为 `enabled: false` 的项不会出现在运行配置中。
+`repos` 用于确认哪些仓库实际处于启用状态，以及它们解析后的容量。`enabled: false` 的配置项不会参与运行配置。
 
-`runners` 只显示当前可见的 ephemeral runner container，并在能够关联时显示正在执行的 workflow job。
+`runners` 会列出当前可见的临时 runner 容器。如果 listener 日志中包含足够信息，还会显示各 runner 正在执行的工作流作业。
 
-`stats` 是一次性 Docker 资源快照，包含 Aktion listener 和 runner 的 CPU、内存与网络 I/O。它不是长期监控系统，但足够用来判断是否应该降低 `maxRunners`。
+`stats` 显示 Aktion listener 和 runner 的一次性 Docker 资源快照，包括 CPU、内存和网络 I/O。它不是持续监控工具，但可用于判断 `maxRunners` 是否设置过高。
 
 ## 跟踪日志
 
@@ -54,69 +54,69 @@ aktion stats
 aktion logs
 ```
 
-只看一个 repository：
+只查看一个仓库：
 
 ```text
 aktion logs my-repo
 ```
 
-日志命令会跟踪输出，并先显示最近 200 行。按终端常用方式（通常是 Ctrl+C）结束跟踪不会停止 listener。
+命令会先显示最近 200 行日志，然后持续跟踪输出。按终端通常的方式退出日志跟踪（一般为 Ctrl+C）不会停止 listener。
 
-## 检查 GitHub 侧 scale set
+## 查看 GitHub 端的 scale set
 
 ```text
 aktion scalesets
 ```
 
-这个命令直接检查每个已启用 repository 在 GitHub Actions 服务中的 scale set。正常运行时应看到 `FOUND`。
+该命令会直接查询 GitHub Actions 服务，检查每个已启用仓库的 scale set。正常运行的仓库通常应显示 `FOUND`。
 
-如果本地 listener 已退出，而 GitHub 侧仍残留同名 scale set，下一次启动可能遇到 `RunnerScaleSetExistsException`。这时使用下一节的 cleanup。
+如果 listener 退出时未能删除远端 scale set，下次启动可能出现 `RunnerScaleSetExistsException`。此时应执行 cleanup，而不是修改生成的状态文件。
 
-## 清理 stale scale set
+## 清理遗留的 scale set
 
-先确认当前没有重要 job 在运行，然后：
+先确认没有需要继续执行的作业：
 
 ```text
 aktion cleanup
 ```
 
-Aktion 会先停止本地 listener，再删除已配置 repository 的远端 scale set，最后重新启动 listener。
+Aktion 会先停止本地 listener，删除已配置仓库的远端 scale set；全部清理成功后，再重新启动 listener。
 
-为避免意外中断，检测到正在运行的 ephemeral runner 时，默认会拒绝 cleanup。
+默认情况下，只要检测到正在运行的临时 runner，cleanup 就会拒绝继续。
 
-!!! danger "cleanup --force 会中断活跃工作"
-    只有确定这些 job 可以被打断时才运行：
+!!! danger "cleanup --force 可能中断正在执行的作业"
+    只有确认这些作业可以被终止时，才执行：
 
     ```text
     aktion cleanup --force
     ```
 
-如果只想清掉远端状态而暂时不重新启动：
+如果需要删除远端状态，但暂时保持 listener 停止：
 
 ```text
 aktion cleanup --no-start
 ```
 
-如果远端清理过程中有 repository 失败，Aktion 会让本地 listener 保持停止，以避免不断重启并重复报错。先修复显示的 GitHub App、权限或网络问题，再重新执行 cleanup 或 `aktion up`。
+如果一个或多个仓库清理失败，Aktion 会保持 listener 停止，避免反复重启。修复命令显示的 GitHub App、权限或网络问题后，再重新执行 cleanup 或运行 `aktion up`。
 
-## 在改配置前查看最终结果
+## 检查最终配置
 
-继承、preset 和 Feature 较多时，先查看一个 repository 的最终环境：
+配置包含继承、preset 或 Feature 时，可先查看单个仓库解析后的配置：
 
 ```text
 aktion config resolve my-repo
 ```
 
-要验证生成的 Docker Compose 是否有效：
+生成 Compose 文件并由 Docker Compose 验证：
 
 ```text
 aktion config
 ```
 
-只想生成 `compose.generated.yaml` 而不调用 Docker Compose 校验：
+仅生成 `compose.generated.yaml`：
 
 ```text
 aktion render
 ```
 
-`compose.generated.yaml` 是 Aktion 生成物。不要把它当成长期手工维护的配置来源；下一次 render、up 或 restart 都可能重写它。
+`compose.generated.yaml` 是 Aktion 生成的状态文件。不要将手工修改视为持久配置；`render`、`up` 或 `restart` 都可能覆盖该文件。

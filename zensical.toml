@@ -1,6 +1,6 @@
 [project]
 site_name = "Aktion"
-site_description = "不用 Kubernetes 的自托管 GitHub Actions runner"
+site_description = "无需 Kubernetes 的自托管 GitHub Actions runner"
 site_url = "https://zyf722.github.io/aktion/"
 docs_dir = "docs/zh"
 site_dir = "site"
@@ -8,13 +8,13 @@ nav = [
   { "首页" = "index.md" },
   { "快速开始" = "getting-started.md" },
   { "使用指南" = [
-    { "添加 repository" = "guides/repositories.md" },
-    { "Runner 数量与并发" = "guides/capacity.md" },
-    { "Runner 环境" = "guides/runner-environment.md" },
-    { "HTTP/HTTPS proxy" = "guides/proxy.md" },
+    { "添加和管理仓库" = "guides/repositories.md" },
+    { "配置 runner 数量和并发" = "guides/capacity.md" },
+    { "配置 runner 环境" = "guides/runner-environment.md" },
+    { "配置 HTTP/HTTPS 代理" = "guides/proxy.md" },
   ] },
-  { "运行与维护" = "operations.md" },
-  { "工作原理" = "concepts/how-it-works.md" },
+  { "运行和维护" = "operations.md" },
+  { "工作方式" = "concepts/how-it-works.md" },
   { "参考" = [
     { "配置参考" = "reference/configuration.md" },
     { "CLI 参考" = "reference/cli.md" },

@@ -34,9 +34,7 @@ go.work.sum
 # Aktion local state
 /config.json
 /compose.generated.yaml
-/secrets/*
-!/secrets/.gitkeep
-/dist/*
-!/dist/.gitkeep
+/secrets/
+/dist/
 *.log
 .DS_Store

@@ -1,6 +1,6 @@
 # 配置参考
 
-Aktion 默认从当前配置根目录读取 `config.json`。可以用 `--root DIR` 改变根目录，用 `--config FILE` 改变文件名。未知字段会被拒绝，因此拼错 key 不会被静默忽略。
+Aktion 默认从配置根目录读取 `config.json`。使用 `--root DIR` 可以更改配置根目录，使用 `--config FILE` 可以指定其他配置文件名。配置中出现未知 JSON 字段时，Aktion 会报错，因此拼写错误的字段不会被静默忽略。
 
 ## 完整结构
 
@@ -43,42 +43,42 @@ Aktion 默认从当前配置根目录读取 `config.json`。可以用 `--root DI
 }
 ```
 
-这只是一个完整形态的示例，不表示你必须写出所有字段。省略可选字段通常比显式复制默认值更容易维护。
+该示例展示了配置的整体结构，并不要求实际配置写出所有可选字段。能够安全使用默认值的字段通常无需重复声明。
 
 ## `app`
 
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
 | `clientId` | string | 是 | GitHub App Client ID。 |
-| `installationId` | integer | 是 | repository 未覆盖时使用的 App installation ID。不能为 0。 |
-| `privateKeyFile` | string | 是 | GitHub App RSA private key PEM 路径；相对路径以配置根目录为基准。 |
+| `installationId` | integer | 是 | 默认 GitHub App installation ID，不能为 `0`。 |
+| `privateKeyFile` | string | 是 | GitHub App RSA 私钥 PEM 的路径；相对路径以配置根目录为基准。 |
 
-PEM 必须存在并可读取。Aktion 使用 GitHub App 认证，不支持 PAT。
+PEM 文件必须存在且可读。Aktion 仅支持 GitHub App 认证，不支持 PAT 认证。
 
 ## `defaults`
 
-`defaults` 为普通 repository 提供共享值。repository 没有相应覆盖时使用这里的结果。
+按默认方式继承配置的仓库，如果没有覆盖相应字段，就会使用 `defaults` 中的值。
 
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `scaleSetName` | string | `home-docker` | GitHub Runner Scale Set 名称；没有自定义 `labels` 时也作为 workflow 的 runner label。 |
-| `minRunners` | integer | `0` | 每个 repository 的最小 runner 数量。 |
-| `maxRunners` | integer | `1` | 每个 repository 的最大 runner 数量；`0` 表示 unlimited。 |
-| `logLevel` | string | `info` | listener 日志级别；使用 `debug`、`info`、`warn` 或 `error`。 |
-| `labels` | string | 空 | 显式 runner label；为空时使用 scale set 名称。 |
-| `runnerImage` | string | `ghcr.io/actions/actions-runner:latest` | Feature 构建的基础 runner image。 |
-| `runnerFeatures` | object | Aktion 默认 Features | 在继承结果上增加、修改或删除 Feature。 |
-| `extends` | array[string] | 未设置 | 显式指定 OCI runner preset 继承链；一旦出现，会改变默认 Feature 继承方式。 |
+| `scaleSetName` | string | `home-docker` | Runner Scale Set 名称；`labels` 为空时也作为工作流匹配 runner 的标签。 |
+| `minRunners` | integer | `0` | 每个仓库保留的最少 runner 数量。 |
+| `maxRunners` | integer | `1` | 每个仓库允许的最多 runner 数量；`0` 表示不设上限。 |
+| `logLevel` | string | `info` | listener 日志级别：`debug`、`info`、`warn` 或 `error`。 |
+| `labels` | string | 空 | 显式指定 runner 标签；为空时使用 scale set 名称。 |
+| `runnerImage` | string | `ghcr.io/actions/actions-runner:latest` | 构建最终 runner image 时使用的基础 image。 |
+| `runnerFeatures` | object | Aktion 默认 Feature | 在继承结果上增加、修改或删除 Feature。 |
+| `extends` | array[string] | 未设置 | 显式指定 OCI runner preset 的继承顺序；设置后会改变默认 Feature 的继承方式。 |
 
-### 容量规则
+### 容量限制
 
-`minRunners` 与 `maxRunners` 不能为负数。当 `maxRunners > 0` 时，`minRunners` 不能大于 `maxRunners`。
+`minRunners` 和 `maxRunners` 不能为负数。当 `maxRunners > 0` 时，`minRunners` 不能大于 `maxRunners`。
 
-`defaults.maxRunners` **不是全主机总并发**。每个 repository 独立继承这个值。更多例子见[Runner 数量与并发](../guides/capacity.md)。
+`defaults.maxRunners` 不是整台主机的总并发上限。每个仓库都会独立继承该值。示例见 [配置 runner 数量和并发](../guides/capacity.md)。
 
 ### `runnerFeatures`
 
-Feature key 是 `builtin:<id>` 或 OCI Dev Container Feature URI。value 支持四种形式：
+Feature key 可以是 `builtin:<id>`，也可以是 OCI Dev Container Feature URI。value 支持四种形式：
 
 ```json
 {
@@ -93,18 +93,18 @@ Feature key 是 `builtin:<id>` 或 OCI Dev Container Feature URI。value 支持�
 }
 ```
 
-- object：Feature options；
-- string：`{"version":"..."}` 简写；
-- `true`：启用并采用 publisher 默认 options；
-- `false`：从已经继承的 Feature 集中删除。
+- object：显式指定 Feature options；
+- string：`{"version":"..."}` 的简写；
+- `true`：启用 Feature，并使用发布者提供的默认 options；
+- `false`：从继承结果中删除该 Feature。
 
-option value 只接受 string 或 boolean。同一 Feature 在后续配置中再次出现时，options 进行浅层覆盖。
+option value 只能是 string 或 boolean。同一个 Feature 在多个位置出现时，options 会进行浅层合并；后出现的同名 option 会覆盖前面的值。
 
 ### `defaults.extends`
 
-省略 `defaults.extends` 时，Aktion 从自身默认 Features 开始。
+未设置 `defaults.extends` 时，Aktion 从自身的默认 Feature 集开始解析配置。
 
-一旦显式设置 `defaults.extends`，Aktion 会从空 Feature 集开始，并按数组顺序应用 OCI preset。例如：
+显式设置该字段后，Aktion 会从空 Feature 集开始，并按数组顺序应用 OCI preset：
 
 ```json
 {
@@ -121,30 +121,30 @@ option value 只接受 string 或 boolean。同一 Feature 在后续配置中再
 
 ## `repositories`
 
-每个数组元素表示一个 repository。
+`repositories` 数组中的每一项表示一个仓库。
 
-| 字段 | 类型 | 必需/默认 | 说明 |
+| 字段 | 类型 | 必需/默认值 | 说明 |
 | --- | --- | --- | --- |
-| `id` | string | 已启用时必需 | Aktion CLI 中使用的本地标识，也会归一化为 listener service 名称。 |
-| `url` | string | 已启用时必需 | `https://github.com/OWNER/REPO`。 |
-| `enabled` | boolean | `false` | 只有 `true` 的 repository 会参与运行。 |
+| `id` | string | 启用时必需 | Aktion CLI 使用的本地标识；Aktion 也会据此生成 listener 的服务名。 |
+| `url` | string | 启用时必需 | 仓库 URL，格式为 `https://github.com/OWNER/REPO`。 |
+| `enabled` | boolean | `false` | 只有启用的仓库才参与运行配置。 |
 | `installationId` | integer | `app.installationId` | 覆盖默认 GitHub App installation。 |
 | `scaleSetName` | string | defaults | 覆盖 scale set 名称。 |
-| `minRunners` | integer | defaults | 覆盖最小 runner 数。 |
-| `maxRunners` | integer | defaults | 覆盖最大 runner 数；`0` = unlimited。 |
+| `minRunners` | integer | defaults | 覆盖最少 runner 数量。 |
+| `maxRunners` | integer | defaults | 覆盖最多 runner 数量；`0` 表示不设上限。 |
 | `logLevel` | string | defaults | 覆盖 listener 日志级别。 |
-| `labels` | string | defaults | 覆盖 runner label。 |
-| `runnerImage` | string | defaults | 覆盖最终基础 image。 |
-| `runnerFeatures` | object | defaults 后叠加 | 修改最终 Feature 集。 |
-| `extends` | array[string] | 未设置 | 显式重建此 repository 的继承链。 |
+| `labels` | string | defaults | 覆盖 runner 标签。 |
+| `runnerImage` | string | defaults | 覆盖最终使用的基础 image。 |
+| `runnerFeatures` | object | 在继承结果上叠加 | 修改最终 Feature 集。 |
+| `extends` | array[string] | 未设置 | 显式重新构建该仓库的继承关系。 |
 
-至少需要一个 `enabled: true` 的 repository。
+配置中至少要有一个 `enabled: true` 的仓库。
 
-### repository 的 `extends`
+### 仓库的 `extends`
 
-省略时，repository 自然继承已经解析完成的 defaults。
+未设置 `extends` 时，仓库会自动继承已经解析完成的 defaults。
 
-显式写出 `extends` 时，Aktion 会从空的 image/Feature 继承链开始。要继续使用 defaults，必须把字面值 `"defaults"` 写进数组：
+显式设置 `extends` 后，Aktion 会从空的 image 和 Feature 继承状态开始。要继续使用 defaults，必须在数组中加入字面值 `"defaults"`：
 
 ```json
 {
@@ -158,7 +158,7 @@ option value 只接受 string 或 boolean。同一 Feature 在后续配置中再
 }
 ```
 
-`extends: []` 表示不继承 defaults 或任何 preset：
+`extends: []` 表示既不继承 defaults，也不应用任何 preset：
 
 ```json
 {
@@ -169,7 +169,7 @@ option value 只接受 string 或 boolean。同一 Feature 在后续配置中再
 }
 ```
 
-最可靠的检查方式是：
+运行以下命令检查最终结果：
 
 ```text
 aktion config resolve minimal
@@ -177,29 +177,29 @@ aktion config resolve minimal
 
 ## `proxy`
 
-| 字段 | 类型 | 默认 | 说明 |
+| 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `http` | string | 空 | HTTP proxy URL。 |
-| `https` | string | 空 | HTTPS proxy URL。 |
-| `noProxy` | string | 空 | 逗号分隔的直连地址/域名。 |
+| `http` | string | 空 | HTTP 代理 URL。 |
+| `https` | string | 空 | HTTPS 代理 URL。 |
+| `noProxy` | string | 空 | 以逗号分隔、需要直连的主机或域名。 |
 
-`http` 和 `https` 必须使用 `http://` 或 `https://`。Aktion 会拒绝把 proxy host 配成 `localhost`、`127.0.0.1` 或 `::1`，因为 runner container 无法通过自己的 loopback 访问 Docker host；host 上的 proxy 应使用 `host.docker.internal`。
+`http` 和 `https` 必须使用 `http://` 或 `https://`。Aktion 会拒绝将代理主机设置为 `localhost`、`127.0.0.1` 或 `::1`，因为容器不能通过自身的 loopback 访问主机上的代理。代理运行在 Docker 主机上时，请使用 `host.docker.internal`。
 
 ## 验证配置
 
-只解析一个 repository 的最终 runner 环境：
+查看单个仓库最终解析出的 runner 环境：
 
 ```text
 aktion config resolve <repo-id>
 ```
 
-生成 Compose 并让 Docker Compose 验证：
+生成 Compose 文件，并运行 Docker Compose 配置验证：
 
 ```text
 aktion config
 ```
 
-同时检查 Docker、GitHub App、installation 和 repository：
+同时检查 Docker、GitHub App、installation 和仓库：
 
 ```text
 aktion doctor

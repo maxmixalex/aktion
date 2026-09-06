@@ -1,10 +1,10 @@
-# 添加和管理 repository
+# 添加和管理仓库
 
-Aktion 的配置以 repository 为单位。每个 `enabled: true` 的 repository 都会得到自己的 listener 和独立的 runner 容量，因此一台主机可以同时服务多个 repository，而不用让它们共享一份 repository 级状态。
+Aktion 以仓库为单位进行配置。每个 `enabled: true` 的仓库都有独立的 listener 和 runner 容量，因此一台主机可以同时服务多个仓库，各仓库的运行状态和容量互不影响。
 
-## 添加一个 repository
+## 添加仓库
 
-在 `repositories` 数组中加入一项：
+在 `repositories` 数组中增加一项：
 
 ```json
 {
@@ -14,11 +14,11 @@ Aktion 的配置以 repository 为单位。每个 `enabled: true` 的 repository
 }
 ```
 
-`id` 是你在 Aktion CLI 中识别这个 repository 的短名称，例如 `aktion logs website` 或 `aktion config resolve website`。建议只用字母、数字、`-` 和 `_`，并保持唯一。
+`id` 是 Aktion CLI 中使用的短名称，例如 `aktion logs website` 和 `aktion config resolve website`。建议使用字母、数字、`-` 和 `_`，并确保各仓库的 ID 唯一。
 
-`url` 必须是 `https://github.com/OWNER/REPO` 形式。GitHub App 必须已经安装到这个 repository。
+`url` 必须采用 `https://github.com/OWNER/REPO` 形式。GitHub App 必须已经安装到该仓库。
 
-修改后先验证：
+重启前先验证配置：
 
 ```text
 aktion doctor
@@ -31,11 +31,11 @@ aktion config resolve website
 aktion restart
 ```
 
-`restart` 会重新生成 Compose 配置、按需要准备 runner image，并重建 listener stack。
+`restart` 会重新生成 Compose 配置，按需准备 runner image，并重新创建 listener。
 
-## 使用不同的 GitHub App installation
+## 使用其他 GitHub App installation
 
-`app.installationId` 是默认 installation。某个 repository 属于另一个 installation 时，可以覆盖：
+`app.installationId` 是默认 installation。某个仓库属于其他 installation 时，可在仓库配置中覆盖：
 
 ```json
 {
@@ -46,13 +46,13 @@ aktion restart
 }
 ```
 
-仍然使用同一个 `app.clientId` 和 private key；只有 installation ID 改变。运行 `aktion doctor` 可以验证 installation 是否可访问，以及它是否真的包含目标 repository。
+`app.clientId` 和私钥保持不变，仅 installation ID 不同。`aktion doctor` 会检查该 installation 是否可访问，以及它是否包含目标仓库。
 
-## 使用不同的 scale set 名称
+## 使用其他 scale set 名称
 
-默认情况下，所有 repository 都继承 `defaults.scaleSetName`，通常是 `home-docker`。因为 scale set 是 repository-scoped 的，不同 repository 可以使用同一个名称。
+仓库默认继承 `defaults.scaleSetName`，其默认值为 `home-docker`。scale set 的作用域是单个仓库，因此不同仓库可以使用相同的名称。
 
-如果某个 repository 的 workflow 需要另一个 label：
+如需让某个仓库使用其他标签，可覆盖 scale set 名称：
 
 ```json
 {
@@ -63,22 +63,22 @@ aktion restart
 }
 ```
 
-对应 workflow 写：
+对应工作流使用：
 
 ```yaml
 runs-on: build-host
 ```
 
-`labels` 也可以显式指定自定义 label；省略或留空时，listener 会使用 scale set 名称作为 label。除非你确实需要不同的匹配标签，否则保持两者一致最容易理解。
+也可以显式设置 `labels`。省略 `labels` 或将其留空时，listener 会使用 scale set 名称作为标签。没有明确需要时，让两者保持一致更容易维护。
 
-## 暂时停用
+## 停用仓库
 
-不想再为某个 repository 启动 listener 时，将：
+将配置改为：
 
 ```json
 "enabled": false
 ```
 
-然后运行 `aktion restart`。被禁用的项不会参与配置解析或 listener 启动。配置中必须至少保留一个已启用的 repository，否则 Aktion 会拒绝启动。
+然后运行 `aktion restart`。停用的仓库不会参与配置解析，也不会启动 listener。配置中必须至少有一个 `enabled: true` 的仓库，否则 Aktion 会拒绝加载配置。
 
-如果你是在处理 GitHub 侧遗留的旧 scale set，而不是普通停用，请使用[清理 stale scale set](../operations.md)，不要直接编辑生成的 Compose 文件。
+如果 GitHub 端残留了 listener 异常退出后留下的 scale set，请使用[清理遗留的 scale set](../operations.md)，不要修改生成的 Compose 文件。

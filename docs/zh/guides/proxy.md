@@ -1,6 +1,6 @@
-# 配置 HTTP/HTTPS proxy
+# 配置 HTTP/HTTPS 代理
 
-如果 Docker 主机只能通过 proxy 访问 GitHub、OCI registry 或其他外部服务，可以在 `config.json` 的 `proxy` 中统一配置。Aktion 会把这些值传给 listener 和它创建的 runner container。
+Docker 主机需要通过代理访问 GitHub、OCI registry 或其他外部服务时，在 `config.json` 的 `proxy` 中配置代理。Aktion 会将这些值传给 listener，以及由 listener 创建的 runner 容器。
 
 ## 基本配置
 
@@ -14,16 +14,16 @@
 }
 ```
 
-`http` 和 `https` 都必须是完整的 `http://` 或 `https://` URL。只需要一种协议时可以只写对应字段。
+`http` 和 `https` 必须是完整的 `http://` 或 `https://` URL。只需要其中一种代理时，可以只配置相应字段。
 
-!!! warning "不要把 host proxy 写成 localhost"
-    container 中的 `localhost` 和 `127.0.0.1` 指向 container 自己，不是 Docker host。proxy 实际运行在 host 上时，应使用 `host.docker.internal`。
+!!! warning "主机上的代理不要使用 localhost"
+    容器中的 `localhost` 和 `127.0.0.1` 指向容器自身，而不是 Docker 主机。如果代理运行在主机上，请使用 `host.docker.internal`。
 
-Aktion 会为 Linux Docker Engine 增加 `host.docker.internal:host-gateway` 映射，因此同一份配置可以在 Docker Desktop 和普通 Linux Docker host 上使用。
+在 Linux Docker Engine 上，Aktion 会增加 `host.docker.internal:host-gateway` 映射，因此 Docker Desktop 和普通 Linux Docker 主机可以使用相同的主机名。
 
-## 排除不应走 proxy 的地址
+## 为指定地址绕过代理
 
-`noProxy` 会同时传给小写和大写的 `no_proxy` / `NO_PROXY`。它使用常见的逗号分隔形式：
+`noProxy` 会同时传递为 `no_proxy` 和 `NO_PROXY`，使用常见的逗号分隔形式：
 
 ```json
 {
@@ -35,11 +35,11 @@ Aktion 会为 Linux Docker Engine 增加 `host.docker.internal:host-gateway` 映
 }
 ```
 
-具体匹配规则由使用这些环境变量的客户端决定。只把确实应该直连的主机或域名加入列表。
+具体匹配规则由读取这些环境变量的客户端决定。仅将确实需要直连的主机或域名加入列表。
 
-## 带用户名和密码的 proxy
+## 代理认证
 
-URL 可以包含认证信息：
+可以在 URL 中包含认证信息：
 
 ```json
 {
@@ -49,25 +49,25 @@ URL 可以包含认证信息：
 }
 ```
 
-!!! warning "凭据会写在 config.json 中"
-    当前配置格式没有单独的 proxy secret 存储。不要把带用户名或密码的 `config.json` 提交到版本控制，也不要把它作为公开日志或诊断附件发送。
+!!! warning "凭据会保存在 config.json 中"
+    当前配置格式没有单独的代理密钥字段。不要将包含凭据的 `config.json` 提交到版本控制，也不要把它附在公开日志或诊断信息中。
 
-`aktion status` 展示 proxy 时会隐藏 URL 中的用户名和密码，但原始 `config.json` 仍包含它们。
+`aktion status` 显示代理 URL 时会隐藏用户名和密码，但原始 `config.json` 中仍然保存完整凭据。
 
-## 验证
+## 验证配置
 
-修改 proxy 后运行：
+修改代理设置后运行：
 
 ```text
 aktion doctor
 aktion restart
 ```
 
-如果问题出现在 runner image 的 Feature 构建阶段，再检查：
+如果失败发生在基于 Feature 构建 runner image 的阶段，再检查：
 
 ```text
 aktion config resolve <repo-id>
 aktion logs <repo-id>
 ```
 
-如果报错仍显示连接 `localhost`，通常说明 proxy URL 没有改成 host 可达地址。更多症状见[故障排查](../troubleshooting.md)。
+如果错误仍然显示正在访问 `localhost`，通常说明代理地址无法从容器访问。参阅[无法通过代理访问 GitHub 或 registry](../troubleshooting.md)。
