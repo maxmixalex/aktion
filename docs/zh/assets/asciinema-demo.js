@@ -4,8 +4,8 @@ function mountAktionDemo() {
 
   element.dataset.mounted = "true";
   AsciinemaPlayer.create(element.dataset.cast, element, {
-    cols: 140,
-    rows: 30,
+    cols: 80,
+    rows: 24,
     fit: "width",
     preload: true,
     idleTimeLimit: 1.5,
