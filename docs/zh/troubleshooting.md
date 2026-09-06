@@ -12,7 +12,7 @@ aktion doctor
 
 **现象：** `aktion doctor` 或 `aktion status` 报告 Docker 不可用。
 
-直接检查 Docker：
+使用以下命令检查 Docker：
 
 ```text
 docker version
@@ -29,7 +29,7 @@ docker compose version
 
 确认 `app.clientId` 属于生成该 PEM 的同一个 GitHub App，并确认 `app.privateKeyFile` 指向存在且可读的文件。相对路径以 `--root` 指定的配置根目录为基准。
 
-如果 GitHub App 私钥已经轮换，将 `privateKeyFile` 改为当前有效的 PEM。不要把私钥内容直接写入 JSON。
+如果 GitHub App 私钥已经轮换，将 `privateKeyFile` 改为当前有效的 PEM。不要把私钥内容写入 JSON。
 
 ## installation 权限检查失败
 
