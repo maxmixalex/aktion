@@ -1,38 +1,38 @@
-# 定制 runner 环境
+# 配置 runner 环境
 
-Aktion 把 runner 环境视为主机管理员控制的配置，而不是 repository 中 workflow 可以随意改变的基础镜像。你可以使用 Aktion 内置 Feature、公开的 OCI Dev Container Feature，或者 host-only 的 OCI runner preset 组合出环境；项目特有依赖仍然适合在 workflow 中安装。
+runner 环境由 Aktion 主机配置，仓库不能通过工作流重新定义 Aktion 使用的基础环境。可以组合 Aktion 内置 Feature、公开的 OCI Dev Container Feature，以及仅由主机配置的 OCI runner preset。只服务于单个项目的依赖通常更适合在该项目的工作流中安装。
 
 ## 默认环境
 
-如果 `defaults.runnerImage`、`defaults.runnerFeatures` 和 `defaults.extends` 都省略，基础镜像是：
+如果省略 `defaults.runnerImage`、`defaults.runnerFeatures` 和 `defaults.extends`，基础 image 为：
 
 ```text
 ghcr.io/actions/actions-runner:latest
 ```
 
-Aktion 再加入以下默认 Features：
+Aktion 随后加入以下默认 Feature：
 
-| Feature | 默认用途 |
+| Feature | 用途 |
 | --- | --- |
-| `builtin:build` | `build-essential`、`pkg-config`、`cmake`、`file` |
-| `builtin:clang` | 发行版 `clang` 包；依赖 `builtin:build` |
-| `ghcr.io/devcontainers/features/common-utils:2` | 常用命令行工具，关闭 Zsh/Oh My Zsh 与升级系统包 |
-| `ghcr.io/devcontainers/features/python:1` | 使用基础镜像已有 Python，不额外安装 tools |
-| `ghcr.io/devcontainers/features/git-lfs:1` | Git LFS，关闭自动 pull |
+| `builtin:build` | 安装 `build-essential`、`pkg-config`、`cmake` 和 `file` |
+| `builtin:clang` | 安装发行版提供的 `clang`；依赖 `builtin:build` |
+| `ghcr.io/devcontainers/features/common-utils:2` | 提供常用命令行工具，并关闭 Zsh、Oh My Zsh 和系统包升级 |
+| `ghcr.io/devcontainers/features/python:1` | 使用基础 image 中已有的 Python，不额外安装工具 |
+| `ghcr.io/devcontainers/features/git-lfs:1` | 提供 Git LFS，并关闭自动 pull |
 
-因此默认环境适合一般源码 checkout、脚本和 C/C++ 构建，但它**不是** GitHub-hosted Ubuntu VM 的完整软件清单。
+该环境适合常见的源码检出、脚本和 C/C++ 构建，但它不等同于 GitHub-hosted Ubuntu VM 的完整预装软件环境。
 
-你可以随时运行：
+运行：
 
 ```text
 aktion features
 ```
 
-查看当前版本的 builtin 和默认 OCI Features。
+可查看当前 Aktion 版本提供的内置 Feature 和默认 OCI Feature。
 
-## 增加 Dev Container Feature
+## 添加 Dev Container Feature
 
-在 defaults 中加入会影响所有普通继承的 repository：
+在 defaults 中增加 Feature，会影响所有按默认方式继承配置的仓库：
 
 ```json
 "runnerFeatures": {
@@ -44,14 +44,14 @@ aktion features
 }
 ```
 
-Feature 值可以是：
+Feature 的值支持以下形式：
 
-- object：显式 options；
+- object：显式指定 options；
 - string：`{"version": "..."}` 的简写；
-- `true`：使用 publisher 默认 options；
-- `false`：从继承结果中删除这个 Feature。
+- `true`：启用 Feature，并使用发布者提供的默认 options；
+- `false`：从继承结果中删除该 Feature。
 
-例如只为一个 repository 删除默认 Git LFS：
+例如，只对一个仓库移除默认的 Git LFS Feature：
 
 ```json
 {
@@ -64,11 +64,11 @@ Feature 值可以是：
 }
 ```
 
-同一个 Feature 被多层配置时，options 做浅层合并，后面的值覆盖前面的同名 option。
+同一个 Feature 在多处配置中出现时，options 会浅层合并；后出现的同名 option 会覆盖前面的值。
 
-## 从完全基础的 runner 开始
+## 从基础 runner image 开始
 
-如果 repository 显式写了 `extends`，Aktion 会按该数组重新建立继承链。最明显的例子是：
+仓库显式设置 `extends` 后，Aktion 会按照该数组重新构建继承关系。最简单的形式是：
 
 ```json
 {
@@ -79,9 +79,9 @@ Feature 值可以是：
 }
 ```
 
-这表示**不继承 defaults，也不使用 Aktion 默认 Features**。如果没有再写 `runnerFeatures`，最终直接使用基础 runner image。
+这表示该仓库既不继承 defaults，也不使用 Aktion 的默认 Feature。如果没有再设置 `runnerFeatures`，最终会使用基础 runner image。
 
-如果想先继承 defaults，再继续叠加其他 preset，必须明确写入 `"defaults"`：
+如果需要先继承 defaults，再叠加其他 preset，请显式加入字面值 `"defaults"`：
 
 ```json
 "extends": [
@@ -90,12 +90,12 @@ Feature 值可以是：
 ]
 ```
 
-!!! important "显式 extends 会改变继承"
-    repository 省略 `extends` 时会自然继承 defaults；写了 `extends` 后，只会按数组中出现的内容组合。每次调整后用 `aktion config resolve <repo-id>` 查看最终 `baseImage`、`image` 和 `features`。
+!!! important "显式设置 extends 会改变继承关系"
+    仓库未设置 `extends` 时，会自动继承 defaults。只要 `extends` 出现，Aktion 就只按数组中列出的来源组合。修改后运行 `aktion config resolve <repo-id>`，检查最终的 `baseImage`、`image` 和 `features`。
 
-## Host-only OCI preset
+## 仅由主机配置的 OCI runner preset
 
-当多台 Aktion 主机或多个配置需要复用同一组基础 image 与 Features 时，可以把它们发布为 Aktion runner preset。preset 内容是一个 JSON layer，例如：
+多台 Aktion 主机或多份配置需要复用相同的基础 image 和 Feature 时，可以将它们发布为 Aktion runner preset。preset 包含一个 JSON layer，例如：
 
 ```json
 {
@@ -110,16 +110,16 @@ Feature 值可以是：
 }
 ```
 
-Aktion 识别的 artifact type 是 `application/vnd.aktion.runner-preset.v1`，layer media type 是 `application/vnd.aktion.runner-preset.v1+json`。preset 自身不能继续 extends 其它 preset；组合顺序由 `config.json` 决定。
+Aktion 识别的 artifact type 为 `application/vnd.aktion.runner-preset.v1`，layer media type 为 `application/vnd.aktion.runner-preset.v1+json`。preset 本身不能继续继承其他 preset；组合顺序由 `config.json` 决定。
 
 ## 支持范围与限制
 
-Aktion 会处理 Feature options、`dependsOn`、`installsAfter`、`containerEnv`，以及影响 runner container 的 `init`、`privileged`、`capAdd`、`securityOpt`、`mounts` 和 `entrypoint` 元数据。
+Aktion 支持 Feature options、`dependsOn`、`installsAfter` 和 `containerEnv`，以及会影响 runner 容器的 `init`、`privileged`、`capAdd`、`securityOpt`、`mounts` 和 `entrypoint` 元数据。
 
-Dev Container lifecycle hooks（例如 `postCreateCommand`）不会执行，因为 GitHub job workspace 是 runner 启动后才创建的。包含这些 hooks 的 Feature 会产生 warning。
+Dev Container lifecycle hook（例如 `postCreateCommand`）不会执行，因为 GitHub 作业的 workspace 在 runner 启动后才创建。Feature 声明 lifecycle hook 时，Aktion 会显示 warning。
 
-当前 OCI registry 客户端支持 anonymous pull 和 Bearer-token 流程，但没有配置 private registry credentials 的入口。需要认证的私有 Feature/preset registry 因此不能直接使用。
+当前 OCI 客户端支持匿名 pull 和 Bearer token 流程，但没有私有 registry 凭据的配置入口。因此，需要私有认证的 Feature 或 preset registry 无法使用。
 
-## 哪些依赖应该留在 workflow
+## 将项目专用依赖保留在工作流中
 
-如果某个库只服务一个 repository，或者版本需要跟着项目代码变化，优先在 workflow 中安装。把所有项目依赖都塞进公共 runner image 会增加构建时间，也会让 repository 之间产生不必要的耦合。runner 环境更适合放稳定、跨项目共享且明显能节省每次 job 安装成本的工具。
+如果某个依赖只用于一个仓库，或者其版本需要随项目代码一起变化，应在工作流中安装。把所有项目依赖都加入共享 runner image 会增加 image 构建时间，也会让原本无关的仓库相互依赖。runner 环境更适合放置多个项目共用、版本相对稳定，并且每次作业重复安装成本较高的工具。

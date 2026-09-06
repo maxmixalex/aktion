@@ -1,29 +1,29 @@
 # 快速开始
 
-这一页从一个尚未运行 Aktion 的 Docker 主机开始，目标是让一个 GitHub Actions workflow 真正跑到你的自托管 runner 上。完成后，你应该能在 `aktion status` 中看到健康的 listener，并在 GitHub Actions 中看到 job 被 `home-docker` 接走。
+本指南从一台尚未运行 Aktion 的 Docker 主机开始，最终让 GitHub Actions 作业在 Aktion runner 上执行。完成后，`aktion status` 应显示健康的 listener，GitHub Actions 也应能将作业分配给 `home-docker`。
 
 ## 准备运行目录
 
-主机需要 Docker Engine 或 Docker Desktop，并能运行 **Linux containers**；同时需要 Docker Compose v2，即 `docker compose` 命令可用。Manager 支持 Windows、Linux 和 macOS，但 listener 与 runner 当前是 Linux container。
+主机需要 Docker Engine 或 Docker Desktop，并且必须支持 **Linux 容器**；同时需要 Docker Compose v2，即可使用 `docker compose` 命令。Aktion 主程序支持 Windows、Linux 和 macOS，listener 与 runner 当前为 Linux 容器。
 
-一个可运行的 Aktion 目录至少需要：
+可运行的 Aktion 目录至少包含：
 
 ```text
-aktion.exe                 # Windows；Linux/macOS 通常命名为 aktion
+aktion.exe                 # Windows; usually named aktion on Linux/macOS
 config.json
 Dockerfile
 packaging/
   start-listener.sh
 dist/
-  aktion-listener-linux-amd64   # 或 linux-arm64，与 Docker host 架构匹配
+  aktion-listener-linux-amd64   # or linux-arm64, matching the Docker host
 ```
 
-GitHub App 的 PEM 不应包含在分发包或版本控制中。后面会把它放到例如 `secrets/github-app.pem`。
+GitHub App 的 PEM 不应包含在分发包中，也不应提交到版本控制。以下示例将其保存为 `secrets/github-app.pem`。
 
-!!! warning "保护 private key"
-    `privateKeyFile` 指向的 PEM 可以代表 GitHub App 进行认证。不要提交到 repository，也不要把包含 private key 的运行目录公开分享。
+!!! warning "保护私钥"
+    `privateKeyFile` 指向的 PEM 可用于以该 GitHub App 的身份认证。不要将它提交到仓库，也不要共享包含该文件的运行目录。
 
-先确认 Docker：
+先检查 Docker：
 
 === "Windows"
 
@@ -39,21 +39,21 @@ GitHub App 的 PEM 不应包含在分发包或版本控制中。后面会把它�
     docker compose version
     ```
 
-两条命令都应成功。如果 Docker Desktop 正在使用 Windows containers，请先切换到 Linux containers。
+两条命令都应成功。如果 Docker Desktop 当前使用 Windows 容器，请先切换到 Linux 容器。
 
 ## 创建 GitHub App
 
-Aktion 只使用 GitHub App 认证，不提供 PAT 模式。为 Aktion 创建一个 GitHub App，并完成以下设置：
+Aktion 仅支持 GitHub App 认证，不支持 PAT。
 
-1. 在 repository permissions 中把 **Administration** 设为 **Read and write**。
-2. Aktion 不需要 webhook；如果这个 App 只用于 Aktion，可以关闭 webhook。
-3. 把 App 安装到你希望由这台主机执行 Actions 的 repository。
-4. 记录 **Client ID** 和安装对应的数字 **Installation ID**。
-5. 为 App 生成 private key，并保存为 PEM 文件。
+1. 创建 GitHub App，将仓库的 **Administration** 权限设为 **Read and write**。
+2. Aktion 不需要 webhook。若该 App 仅用于 Aktion，可关闭 webhook。
+3. 将 App 安装到需要使用这台 runner 主机的仓库。
+4. 记录 App 的 **Client ID** 和数字形式的 **Installation ID**。
+5. 生成私钥，并将 PEM 文件保存在 Aktion 主机上。
 
-如果多个 repository 属于同一次 App installation，可以共用 `app.installationId`。需要不同 installation 的 repository 可以在自己的配置项中覆盖它。
+属于同一个 App installation 的仓库可以共用 `app.installationId`。如果某个仓库属于其他 installation，可在该仓库的配置项中覆盖此值。
 
-## 写入最小配置
+## 创建最小配置
 
 创建 `config.json`：
 
@@ -80,11 +80,11 @@ Aktion 只使用 GitHub App 认证，不提供 PAT 模式。为 Aktion 创建一
 }
 ```
 
-把 PEM 放到 `./secrets/github-app.pem`。相对路径以 Aktion 的配置根目录为基准；默认就是你运行 Aktion 时的当前目录。
+将 PEM 保存到 `./secrets/github-app.pem`。相对路径以 Aktion 的配置根目录为基准；默认配置根目录是当前工作目录。
 
-`minRunners: 0` 允许没有 job 时缩到零；`maxRunners: 1` 表示这个 repository 同时最多拥有一个 runner。这里的 `maxRunners` 是**每个 repository 的限制**，不是整台主机的总上限。
+`minRunners: 0` 表示没有作业时该仓库可以缩容到零个 runner。`maxRunners: 1` 表示该仓库同时最多运行一个 runner。此上限按仓库计算，不是整台主机的总上限。
 
-## 在启动前检查
+## 启动前验证
 
 === "Windows"
 
@@ -98,9 +98,9 @@ Aktion 只使用 GitHub App 认证，不提供 PAT 模式。为 Aktion 创建一
     ./aktion doctor
     ```
 
-`doctor` 会检查配置 JSON、private key、Docker Engine、Docker Compose、GitHub App 身份、installation 权限，以及 App 是否真的安装到了每个已启用的 repository。
+`doctor` 会检查 JSON 配置、私钥、Docker Engine、Docker Compose、GitHub App 身份、installation 权限，以及 App 是否实际安装到了每个已启用的仓库。
 
-先把所有失败项修好。成功时最后会看到 **All systems operational**。
+如有失败项，先按提示修复。全部检查通过时，末尾会显示 **All systems operational**。
 
 ## 启动 listener
 
@@ -118,13 +118,13 @@ Aktion 只使用 GitHub App 认证，不提供 PAT 模式。为 Aktion 创建一
     ./aktion status
     ```
 
-第一次 `up` 可能需要拉取基础 image、解析 Dev Container Features 并构建本地 runner image。之后 Aktion 会启动每个 repository 的 listener container。
+首次运行 `up` 时，Aktion 可能需要拉取基础 image、解析 Dev Container Feature，并构建本地 runner image。随后会为每个已启用的仓库启动一个 listener 容器。
 
-在 `status` 中，对刚才的 repository 应看到 listener 为 `RUNNING`。此时还没有 job，所以 runner 数量为 0 是正常的。
+`status` 中应显示该仓库的 listener 为 `RUNNING`。此时尚未分配作业，因此 runner 数量为 0 属于正常状态。
 
-## 让 workflow 使用 Aktion
+## 运行第一个工作流
 
-默认 scale set 名称是 `home-docker`。在刚刚配置的 repository 中创建或修改 workflow：
+默认 scale set 名称为 `home-docker`。在已配置的仓库中创建或修改工作流：
 
 ```yaml
 name: Aktion smoke test
@@ -140,19 +140,19 @@ jobs:
       - run: uname -a
 ```
 
-手动触发这个 workflow。随后再次运行：
+手动触发该工作流，然后运行：
 
 ```text
 aktion status
 ```
 
-你应该短暂看到一个 ephemeral runner 和一个 active job；job 完成后，该 runner container 会被销毁。如果 workflow 一直显示等待 runner，转到[Workflow 一直等待 runner](troubleshooting.md)。
+作业开始后，应能短暂看到一个临时 runner 和一个正在运行的作业。作业结束后，该 runner 容器会被删除。如果作业持续等待 runner，请参阅[工作流一直等待 runner](troubleshooting.md)。
 
-## 下一步
+## 后续配置
 
-一个 repository 跑通以后，不需要重新理解系统就可以继续扩展：
+第一个仓库运行正常后，可继续配置：
 
-- [添加更多 repository](guides/repositories.md)
-- [为不同 repository 设置不同并发](guides/capacity.md)
-- [增加 Node、Go、Rust 等 runner Feature](guides/runner-environment.md)
-- [了解日常状态、日志和重启命令](operations.md)
+- [添加更多仓库](guides/repositories.md)
+- [为不同仓库设置不同的并发上限](guides/capacity.md)
+- [为 runner 添加 Node、Go、Rust 等 Feature](guides/runner-environment.md)
+- [查看状态、日志以及重启和清理命令](operations.md)

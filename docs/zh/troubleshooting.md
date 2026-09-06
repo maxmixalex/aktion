@@ -1,82 +1,82 @@
 # 故障排查
 
-遇到问题时先运行：
+首先运行：
 
 ```text
 aktion doctor
 ```
 
-它会把本地配置、Docker、GitHub App 和 repository installation 的问题分组显示。下面的条目从你能观察到的症状出发。
+该命令会分别检查本地配置、Docker、GitHub App 认证和仓库 installation。以下内容按实际可观察的故障现象组织。
 
-## `doctor` 报 Docker Engine 不可用
+## `doctor` 报告 Docker Engine 不可用
 
-**症状：** `aktion doctor` 或 `aktion status` 提示 Docker unavailable。
+**现象：** `aktion doctor` 或 `aktion status` 报告 Docker 不可用。
 
-先直接验证：
+使用以下命令检查 Docker：
 
 ```text
 docker version
 docker compose version
 ```
 
-如果失败，启动 Docker Engine / Docker Desktop。Windows 和 macOS 上还要确认 Docker 能运行 Linux containers；Aktion 的 listener 和 runner 当前不是 Windows container。
+任一命令失败时，启动 Docker Engine 或 Docker Desktop。Windows 和 macOS 上还应确认 Docker 能运行 Linux 容器；Aktion 的 listener 和 runner 当前不是 Windows 容器。
 
-如果 `docker version` 成功而 `docker compose version` 失败，需要安装或启用 Docker Compose v2。
+如果 `docker version` 成功，而 `docker compose version` 失败，请安装或启用 Docker Compose v2。
 
-## `doctor` 报 private key 或 GitHub App identity 失败
+## `doctor` 报告私钥或 GitHub App 身份验证失败
 
-**症状：** Local / GitHub 检查中 private key、JWT 或 App identity 为 FAIL。
+**现象：** Local 或 GitHub 检查项报告 private key、JWT 或 App identity 失败。
 
-检查 `app.clientId` 是否来自生成该 PEM 的同一个 GitHub App，并确认 `app.privateKeyFile` 路径存在、可读。相对路径以 `--root` 指定的配置目录为基准。
+确认 `app.clientId` 属于生成该 PEM 的同一个 GitHub App，并确认 `app.privateKeyFile` 指向存在且可读的文件。相对路径以 `--root` 指定的配置根目录为基准。
 
-如果你换过 App private key，只需要让 `privateKeyFile` 指向当前有效 PEM；不要把 private key 内容直接写进 JSON。
+如果 GitHub App 私钥已经轮换，将 `privateKeyFile` 改为当前有效的 PEM。不要把私钥内容写入 JSON。
 
-## Installation 权限检查失败
+## installation 权限检查失败
 
-**症状：** `doctor` 显示 installation 可访问，但 `administration` 不是 `write`。
+**现象：** installation 可以访问，但 `doctor` 显示 `administration` 不是 `write`。
 
-在 GitHub App 的 repository permissions 中把 **Administration** 设置为 **Read and write**，然后确认安装已接受更新后的权限。再次运行：
+将 GitHub App 的仓库 **Administration** 权限设为 **Read and write**，并确认 installation 已接受更新后的权限。然后重新运行：
 
 ```text
 aktion doctor
 ```
 
-Aktion 不支持用 PAT 绕过这个要求。
+Aktion 不支持使用 PAT 绕过该权限要求。
 
-## Repository 显示 App 未安装或 installation 不匹配
+## 仓库未安装 App 或 installation 不匹配
 
-**症状：** `doctor` 的 Repositories 区域显示 App is not installed、repo inaccessible，或者实际 installation ID 与配置不同。
+**现象：** Repositories 区域显示 App 未安装、仓库不可访问，或者实际 installation ID 与配置不一致。
 
-先在 GitHub App 的 installation 页面确认目标 repository 已被选中。如果多个 repository 分属于不同 installation，在对应 repository 配置中覆盖：
+检查 GitHub App installation，确认目标仓库已包含在安装范围内。如果不同仓库属于不同 installation，在对应的仓库配置中覆盖：
 
 ```json
 "installationId": 87654321
 ```
 
-然后再次运行 `aktion doctor`。
+然后重新运行 `aktion doctor`。
 
-## Listener 不断重启或显示 `RunnerScaleSetExistsException`
+## listener 持续重启或出现 `RunnerScaleSetExistsException`
 
-**症状：** `aktion status` 中 listener 为 `RESTARTING` / `EXITED`，最近错误包含 `RunnerScaleSetExistsException`。
+**现象：** `aktion status` 显示 listener 为 `RESTARTING` 或 `EXITED`，近期错误中包含 `RunnerScaleSetExistsException`。
 
-先确认没有重要 job 在执行：
+先确认没有需要继续执行的作业：
 
 ```text
 aktion runners
 aktion scalesets
 ```
 
-然后：
+然后运行：
 
 ```text
 aktion cleanup
 ```
 
-Aktion 默认会在仍有 ephemeral runner 时拒绝 cleanup。只有确认可以中断 job 时才使用 `aktion cleanup --force`。
+检测到正在运行的临时 runner 时，cleanup 默认会拒绝继续。只有确认可以中断这些作业时，才使用 `aktion cleanup --force`。
 
-## Workflow 一直等待 runner
+## 工作流一直等待 runner
 
-**症状：** GitHub Actions job 长时间处于 queued / waiting for runner。
+**现象：** GitHub Actions 作业长时间处于 queued 状态，或持续提示正在等待 runner。
 
 依次检查：
 
@@ -86,88 +86,88 @@ aktion scalesets
 aktion logs <repo-id>
 ```
 
-确认 listener 为 `RUNNING`、GitHub 侧 scale set 为 `FOUND`，并确认 workflow 的 `runs-on` 与实际 label 一致。没有显式 `labels` 时，label 就是 `scaleSetName`；默认值为 `home-docker`。
+listener 应为 `RUNNING`，远端 scale set 应为 `FOUND`，工作流的 `runs-on` 也必须与最终 runner 标签一致。未显式设置 `labels` 时，标签就是 `scaleSetName`，默认值为 `home-docker`。
 
-如果 `status` 显示 Pending 大于 0，但 runner 数量已经达到 `maxRunners`，这是容量限制在起作用。提高该 repository 的上限，或等待现有 job 完成：
+如果 `status` 显示有等待中的作业，同时该仓库的 runner 数量已经达到 `maxRunners`，说明容量上限正在生效。提高该仓库的上限，或者等待现有作业结束：
 
 ```text
 aktion config resolve <repo-id>
 ```
 
-`maxRunners: 0` 表示 unlimited，但不要用它来掩盖主机资源不足。
+`maxRunners: 0` 表示不设 runner 数量上限，但不应以此掩盖主机容量不足的问题。
 
-## Runner image 或 Feature 构建失败
+## runner image 或 Feature 构建失败
 
-**症状：** `aktion up` / `restart` 在 Resolving runner features 或 Building runner image 阶段失败。
+**现象：** `aktion up` 或 `restart` 在解析 runner Feature 或构建 runner image 时失败。
 
-先检查最终解析结果：
+先检查最终配置：
 
 ```text
 aktion config resolve <repo-id>
 aktion features
 ```
 
-确认 Feature URI 和 options 正确。公开 OCI Feature 可以使用 anonymous 或 Bearer-token registry 流程；当前没有 private registry credential 配置，因此需要认证的私有 registry 会失败。
+确认 Feature URI 和 options 正确。公开 OCI Feature 可以使用匿名或 Bearer token registry 流程；当前不能配置私有 registry 凭据，因此需要私有认证的 registry 会失败。
 
-如果 warning 提到 Dev Container lifecycle hook，这是已知限制：Aktion 不执行 `postCreateCommand` 等 lifecycle hooks。需要的项目初始化应放到 GitHub Actions workflow 中。
+如果 warning 提到 Dev Container lifecycle hook，这是当前的已知限制：Aktion 不执行 `postCreateCommand` 等 hook。项目初始化步骤应放在 GitHub Actions 工作流中。
 
-## 修改了配置但运行状态没有变化
+## 修改配置后运行行为没有变化
 
-**症状：** `config.json` 已改，但 listener 仍使用旧容量、Feature 或 proxy。
+**现象：** `config.json` 已修改，但 listener 仍使用原来的容量、Feature 或代理配置。
 
-配置文件不会热更新。运行：
+Aktion 不会热加载配置。运行：
 
 ```text
 aktion config resolve <repo-id>
 aktion restart
 ```
 
-第一条确认解析结果是你预期的，第二条让 listener stack 使用新配置。
+第一条命令用于确认新的最终配置，第二条命令会按新配置重新创建 listener。
 
-如果你手工编辑过 `compose.generated.yaml`，不要依赖其中改动；它会被 Aktion 重新生成。
+不要依赖对 `compose.generated.yaml` 的手工修改；Aktion 会重新生成该文件。
 
-## 无法通过 proxy 访问 GitHub 或 registry
+## 无法通过代理访问 GitHub 或 registry
 
-**症状：** host 上 proxy 正常，但 listener 或 runner 报 connection refused / timeout。
+**现象：** 主机上的代理可以正常使用，但 listener 或 runner 报告 connection refused 或 timeout。
 
-如果 proxy 在 Docker host 上，配置中不能写：
+如果代理运行在 Docker 主机上，不要配置为：
 
 ```text
 http://localhost:3081
 ```
 
-应改为：
+应使用：
 
 ```text
 http://host.docker.internal:3081
 ```
 
-Aktion 会为 Linux Docker Engine 提供对应 host-gateway 映射。修改后运行 `aktion restart`。
+在 Linux Docker Engine 上，Aktion 会增加对应的 host-gateway 映射。修改配置后运行 `aktion restart`。
 
-## Runner 很慢或主机内存不足
+## runner 性能骤降或主机内存不足
 
-**症状：** 多个 job 同时开始后，CPU 持续满载、内存接近耗尽或 Docker 明显变慢。
+**现象：** 多个作业并发执行后，CPU 长时间满载、内存接近耗尽，或者 Docker 响应明显变慢。
 
-查看一次性资源快照：
+查看资源快照：
 
 ```text
 aktion stats
 ```
 
-然后降低该 repository 的 `maxRunners`。记住多个 repository 的上限是彼此独立的；例如三个 repository 都设为 4，主机可能同时运行 12 个 runner。
+然后降低相应仓库的 `maxRunners`。各仓库的限制彼此独立：三个仓库都设置为四个 runner 时，主机最多可能同时运行十二个 runner。
 
-## 还需要更多日志
+## 收集诊断信息
 
-跟踪全部 listener：
+跟踪所有 listener：
 
 ```text
 aktion logs
 ```
 
-只看一个 repository：
+或只查看一个仓库：
 
 ```text
 aktion logs <repo-id>
 ```
 
-排障时优先提供具体失败段落、`aktion doctor` 的失败项和 `aktion config resolve <repo-id>` 输出；不要附带 GitHub App private key 或包含 proxy 密码的原始配置。
+提交诊断信息时，优先提供失败的 `aktion doctor` 检查项、相关日志片段，以及 `aktion config resolve <repo-id>` 的输出。不要包含 GitHub App 私钥或未隐藏密码的代理 URL。

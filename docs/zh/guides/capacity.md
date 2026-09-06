@@ -1,10 +1,10 @@
-# 设置 runner 数量与并发
+# 配置 runner 数量和并发
 
-Aktion 的容量限制是 **per repository** 的。理解这一点可以避免最常见的配置误会：`defaults.maxRunners` 只是每个 repository 继承的默认值，并不是整台 Docker 主机的全局并发上限。
+Aktion 的容量限制按仓库分别计算。`defaults.maxRunners` 是各仓库继承的默认值，不是 Docker 主机的全局并发上限。
 
-## 默认缩到零
+## 空闲时缩容到零
 
-推荐的起点是：
+推荐从以下配置开始：
 
 ```json
 "defaults": {
@@ -13,9 +13,9 @@ Aktion 的容量限制是 **per repository** 的。理解这一点可以避免�
 }
 ```
 
-没有 job 时，`minRunners: 0` 允许 runner 数量降到零，只保留轻量 listener。GitHub 分配 job 后，listener 再创建 runner container。
+设置 `minRunners: 0` 后，没有作业时该仓库可以保持零个 runner，只保留轻量的 listener。GitHub 分配作业后，listener 再创建 runner。
 
-如果你希望某个 repository 始终保留一定 runner 容量，可以提高 `minRunners`：
+如果某个仓库需要降低 runner 启动带来的等待时间，可以保留一定的最低容量：
 
 ```json
 {
@@ -27,11 +27,11 @@ Aktion 的容量限制是 **per repository** 的。理解这一点可以避免�
 }
 ```
 
-`minRunners` 和 `maxRunners` 不能为负数；当 `maxRunners` 大于 0 时，`minRunners` 不能超过它。
+`minRunners` 和 `maxRunners` 都不能为负数。当 `maxRunners` 大于 0 时，`minRunners` 不能大于 `maxRunners`。
 
-## 为 repository 单独提高上限
+## 单独提高某个仓库的上限
 
-假设默认上限是 2：
+假设默认值为：
 
 ```json
 "defaults": {
@@ -39,9 +39,9 @@ Aktion 的容量限制是 **per repository** 的。理解这一点可以避免�
 }
 ```
 
-两个 repository 都继承这个值时，它们各自最多运行 2 个 runner，因此主机上理论上可以同时出现 4 个 runner。Aktion 当前没有额外的“整台主机最多 N 个 runner”总量限制。
+两个仓库都继承该值时，每个仓库最多可以运行两个 runner，因此主机理论上可同时运行四个 runner。Aktion 当前没有额外的全主机 runner 总量限制。
 
-需要更高并发的 repository 直接覆盖：
+需要更高并发的仓库可以单独覆盖该值：
 
 ```json
 {
@@ -52,17 +52,17 @@ Aktion 的容量限制是 **per repository** 的。理解这一点可以避免�
 }
 ```
 
-修改后用下面的命令确认最终值，而不是靠肉眼推断继承关系：
+修改后运行以下命令，确认最终解析结果：
 
 ```text
 aktion config resolve hpclang
 ```
 
-输出中的 `minRunners` 和 `maxRunners` 就是这个 repository 实际传给 listener 的容量。
+输出中的 `minRunners` 和 `maxRunners` 就是 listener 实际使用的容量设置。
 
-## 不设置上限
+## 取消 runner 上限
 
-`maxRunners: 0` 在 Aktion 中表示 unlimited：
+在 Aktion 中，`maxRunners: 0` 表示不设置 runner 数量上限：
 
 ```json
 {
@@ -73,11 +73,11 @@ aktion config resolve hpclang
 }
 ```
 
-!!! warning "Unlimited 不等于无限资源"
-    Aktion 不会在 `maxRunners: 0` 时替你控制主机的 CPU、内存或磁盘压力。大量并发 job 可以让 Docker 主机耗尽资源。只有在外部已经有容量约束，或者你明确接受这种风险时才使用 unlimited。
+!!! warning "不设上限并不代表主机资源无限"
+    使用 `maxRunners: 0` 时，Aktion 不会额外限制 CPU、内存或磁盘用量。作业集中到达时，runner 数量可能迅速增加并耗尽 Docker 主机资源。仅在已有其他容量限制，或能够接受这一风险时使用该设置。
 
-运行期间可以用 `aktion stats` 看当前 listener 与 runner container 的一次性 CPU/内存快照，用 `aktion status` 看每个 repository 的 runner、active job 和等待中的 job 数量。
+运行期间，`aktion stats` 可显示 listener 和 runner 容器当前的 CPU、内存快照；`aktion status` 可显示 runner、正在执行的作业，以及已分配但仍在等待的作业。
 
-## 选择合理上限
+## 选择合适的上限
 
-对编译、测试等 CPU 密集 workload，通常先从“主机能稳定承受的并发 job 数”开始，而不是从 CPU 线程数机械换算。不同 workflow 的内存和 I/O 差异可能很大，先把 `maxRunners` 设得保守，再结合 `aktion stats` 和真实构建耗时调整。
+对于编译和测试等 CPU 密集型工作负载，应根据主机能够稳定承受的并发作业数设置上限，而不是简单按 CPU 线程数换算 runner 数量。不同工作流的内存和 I/O 需求可能差异很大。建议先设置较低的上限，再结合实际构建耗时和 `aktion stats` 的结果调整。

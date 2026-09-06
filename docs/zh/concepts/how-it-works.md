@@ -1,54 +1,54 @@
-# Aktion 如何工作
+# Aktion 的工作方式
 
-理解 Aktion 不需要知道它的内部 package。对使用者来说，关键只有三个对象：Docker host、每个 repository 的 listener，以及为 job 临时创建的 runner。
+从使用者角度，Aktion 包含三个关键部分：Docker 主机、每个仓库对应的 listener，以及为作业临时创建的 runner。
 
 ```mermaid
 flowchart LR
     GH["GitHub Actions"]
-    L["Repository listener"]
-    R1["Ephemeral runner"]
-    R2["Ephemeral runner"]
-    D["Docker host"]
+    L["仓库 listener"]
+    R1["临时 runner"]
+    R2["临时 runner"]
+    D["Docker 主机"]
 
-    GH -- "分配 job" --> L
+    GH -- "分配作业" --> L
     L -- "创建" --> R1
     L -- "按需创建" --> R2
-    R1 -- "执行完成后销毁" --> L
-    R2 -- "执行完成后销毁" --> L
+    R1 -- "作业结束后删除" --> L
+    R2 -- "作业结束后删除" --> L
     D --- L
     D --- R1
     D --- R2
 ```
 
-## 一个 repository，一个 listener
+## 每个仓库对应一个 listener
 
-每个 `enabled: true` 的 repository 都有独立 listener，并在 GitHub 侧注册自己的 Runner Scale Set。相同的 `scaleSetName` 可以被多个 repository 使用，因为它们的注册范围不同。
+每个 `enabled: true` 的仓库都有独立的 listener，并在 GitHub 中注册自己的 Runner Scale Set。由于注册范围限定在仓库内，不同仓库可以使用相同的 `scaleSetName`。
 
-listener 是常驻的轻量 container。真正执行 workflow 的 runner 不需要常驻：当 GitHub 分配 job 时创建，完成后销毁。设置 `minRunners: 0` 时，没有工作负载就可以缩到零个 runner。
+listener 是持续运行的轻量容器，执行作业的 runner 则按需创建。GitHub 分配作业后，listener 创建 runner；作业结束后，runner 被删除。设置 `minRunners: 0` 时，仓库空闲期间可以保持零个 runner。
 
-## 容量是 repository 级的
+## 容量按仓库独立计算
 
-`maxRunners` 限制一个 repository 同时可以创建多少 runner。假设两个 repository 都继承 `maxRunners: 3`，那么每个都可以最多运行 3 个 runner；Aktion 不会把两者合并成一个“全主机 3 个”的池。
+`maxRunners` 决定单个仓库同时最多拥有多少个 runner。如果两个仓库都继承 `maxRunners: 3`，每个仓库都可以最多创建三个 runner。Aktion 不会把两者合并成全主机共享的三个 runner。
 
-这也意味着主机容量需要由你自己规划。把多个 repository 都设成 unlimited 可能让 Docker 主机同时创建大量 container。
+因此，Docker 主机的总容量需要单独规划。多个仓库都不设置 runner 上限时，作业集中到达可能同时创建大量容器。
 
-## Runner image 由 host 决定
+## runner image 由主机配置
 
-目标 repository 的 workflow 决定 job 要执行什么，但不能通过 Aktion 配置改变 host 管理的基础 runner image 或 Feature 集。Aktion 根据 `config.json` 解析最终环境，需要时先构建本地 runner image，再把这个 image 交给 listener 使用。
+仓库工作流决定作业执行的命令，但不能通过 Aktion 配置重新定义由主机管理的基础 runner image 或 Feature 集。Aktion 根据 `config.json` 解析最终环境，必要时构建本地 image，再将该 image 交给 listener。
 
-默认基础镜像是官方轻量 runner image，不是 GitHub-hosted Ubuntu VM。需要哪些稳定的共享工具，应在 [Runner 环境](../guides/runner-environment.md) 中配置；只属于一个项目的依赖通常直接在 workflow 安装更合适。
+默认基础环境使用 GitHub 提供的轻量 actions runner image，而不是 GitHub-hosted Ubuntu VM。稳定、跨项目共用的工具可以加入 [runner 环境](../guides/runner-environment.md)；项目专用依赖通常应留在工作流中。
 
-## GitHub App 负责身份
+## GitHub App 认证
 
-Manager 使用你配置的 GitHub App private key 生成 App JWT，并验证 installation 与 repository。listener 随后使用对应 GitHub App installation 身份连接 Runner Scale Set 服务。
+Aktion 主程序使用配置的 GitHub App 私钥完成认证，并检查 installation 与仓库。listener 则使用相应 installation 的身份连接 Runner Scale Set 服务。
 
-Aktion 要求 installation 对 repository 具有 **Administration: Read and write** 权限。它不支持用 PAT 代替 GitHub App。
+该 installation 必须拥有仓库的 **Administration: Read and write** 权限。Aktion 不支持使用 PAT 代替 GitHub App。
 
-## Docker 是执行边界
+## 作业在 Docker 容器中执行
 
-listener 通过 Docker Engine 创建 ephemeral runner container，所以 Aktion 运行目录所在主机必须能访问 Docker daemon，并能运行 Linux container。
+listener 通过 Docker Engine 创建临时 runner 容器，因此主机必须提供可访问的 Docker daemon，并支持 Linux 容器。
 
-!!! warning "只把可信的 workflow 放到自托管 runner"
-    自托管 runner 会执行 repository workflow 中的任意命令，并能访问你授予该 runner 的网络与运行环境。不要把不受信任的公开 pull request 或陌生 repository 随意接入有敏感网络访问权限的主机。Aktion 的 ephemeral runner 能减少跨 job 残留，但不会把不可信代码自动变成安全代码。
+!!! warning "仅将可信工作流接入自托管 runner"
+    自托管 runner 会执行仓库工作流中的任意命令，并可以访问授予该 runner 的网络和运行环境。不要将不受信任的公开 pull request 或陌生仓库接入可访问敏感资源的主机。临时 runner 可以减少作业之间残留的状态，但不会自动隔离不可信代码带来的风险。
 
-如果你只想把第一个 workflow 跑起来，不必先读完这一页；直接从[快速开始](../getting-started.md)进入即可。
+如需先完成第一次运行，可按照[快速开始](../getting-started.md)操作。
