@@ -21,7 +21,7 @@ dist/
 GitHub App 的 PEM 不应包含在分发包中，也不应提交到版本控制。以下示例将其保存为 `secrets/github-app.pem`。
 
 !!! warning "保护私钥"
-    `privateKeyFile` 指向的 PEM 可用于以该 GitHub App 的身份进行认证。不要将它提交到仓库，也不要共享包含该文件的运行目录。
+    `privateKeyFile` 指向的 PEM 可用于以该 GitHub App 的身份认证。不要将它提交到仓库，也不要共享包含该文件的运行目录。
 
 先检查 Docker：
 
