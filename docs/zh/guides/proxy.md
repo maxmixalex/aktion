@@ -14,7 +14,7 @@ Docker 主机需要通过代理访问 GitHub、OCI registry 或其他外部服�
 }
 ```
 
-`http` 和 `https` 必须是完整的 `http://` 或 `https://` URL。只需要其中一种代理时，可以只配置相应字段。
+`http` 和 `https` 必须是完整的 `http://` 或 `https://` URL。环境只使用其中一种代理时，仅配置对应字段。
 
 !!! warning "主机上的代理不要使用 localhost"
     容器中的 `localhost` 和 `127.0.0.1` 指向容器自身，而不是 Docker 主机。如果代理运行在主机上，请使用 `host.docker.internal`。
