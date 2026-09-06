@@ -6,6 +6,13 @@ repo_url = "https://github.com/zyf722/aktion"
 repo_name = "zyf722/aktion"
 docs_dir = "docs/en"
 site_dir = "site/en"
+extra_css = [
+  "https://cdn.jsdelivr.net/npm/asciinema-player@3.17.0/dist/bundle/asciinema-player.css",
+]
+extra_javascript = [
+  "https://cdn.jsdelivr.net/npm/asciinema-player@3.17.0/dist/bundle/asciinema-player.min.js",
+  "assets/asciinema-demo.js",
+]
 nav = [
   { "Home" = "index.md" },
   { "Quick start" = "getting-started.md" },
@@ -27,6 +34,7 @@ nav = [
 [project.theme]
 language = "en"
 logo = "assets/aktion.svg"
+favicon = "assets/aktion.svg"
 features = [
   "navigation.instant",
   "navigation.instant.progress",

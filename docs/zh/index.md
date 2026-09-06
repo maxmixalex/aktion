@@ -1,6 +1,6 @@
 # Aktion
 
-**Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.**
+**Aktion 是一个面向 Docker 主机的轻量级 GitHub Actions runner scale-set 管理器。**
 
 Aktion 可让一台普通的 Docker 主机按需为多个 GitHub 仓库提供 runner。每个启用的仓库都有独立的 GitHub Runner Scale Set listener。GitHub 分配作业后，Aktion 会创建临时 Linux runner 容器，并在作业结束后将其删除。这样既保留 GitHub Actions 原有的工作流和排队机制，也无需仅为弹性 runner 部署 Kubernetes 或 Actions Runner Controller。
 
@@ -8,6 +8,12 @@ Aktion 适合希望自行管理 runner 主机和软件环境，又不需要长�
 
 !!! note "默认环境不同于 GitHub-hosted Ubuntu"
     默认 runner 以 `ghcr.io/actions/actions-runner:latest` 为基础，并加入 Aktion 的默认 Feature。它不会自动包含 GitHub-hosted `ubuntu-24.04` 预装的全部工具。项目专用依赖应由工作流安装，或者明确加入由主机管理的 runner 环境。
+
+## CLI 演示
+
+下面的 [asciinema](https://asciinema.org/) 录屏由当前 Aktion 源码实际构建后生成，展示 `aktion features` 和 `aktion help`。播放不需要 GitHub App、Docker daemon 或其他运行配置。
+
+<div id="aktion-cli-demo" data-cast="assets/aktion-demo.cast"></div>
 
 ## 开始使用
 

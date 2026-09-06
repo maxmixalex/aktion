@@ -4,7 +4,7 @@
 
 <h1 align="center">Aktion</h1>
 
-<p align="center"><strong>Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.</strong></p>
+<p align="center"><strong>Aktion 是一个面向 Docker 主机的轻量级 GitHub Actions runner scale-set 管理器。</strong></p>
 
 Aktion 在普通 Docker host 上运行 repository-scoped GitHub Runner Scale Set listener；GitHub 分配 job 后创建临时 Linux runner container，job 完成后销毁。
 

@@ -9,6 +9,12 @@ Aktion is aimed at individuals and small teams that want to control their own ru
 !!! note "This is not a clone of GitHub-hosted Ubuntu"
     The default runner starts from `ghcr.io/actions/actions-runner:latest` and adds Aktion's default Features. It does not automatically contain every tool preinstalled on GitHub-hosted `ubuntu-24.04`. Project-specific dependencies should still be installed by the workflow or explicitly added to the host-controlled runner environment.
 
+## CLI demo
+
+This [asciinema](https://asciinema.org/) recording is generated from a real build of the current Aktion source and shows `aktion features` and `aktion help`. Playback does not require a GitHub App, Docker daemon, or any runtime configuration.
+
+<div id="aktion-cli-demo" data-cast="assets/aktion-demo.cast"></div>
+
 ## Start here
 
 For a first deployment, work through these steps in order:

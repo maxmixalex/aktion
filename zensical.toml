@@ -1,11 +1,18 @@
 [project]
 site_name = "Aktion"
-site_description = "Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts."
+site_description = "Aktion 是一个面向 Docker 主机的轻量级 GitHub Actions runner scale-set 管理器。"
 site_url = "https://zyf722.github.io/aktion/"
 repo_url = "https://github.com/zyf722/aktion"
 repo_name = "zyf722/aktion"
 docs_dir = "docs/zh"
 site_dir = "site"
+extra_css = [
+  "https://cdn.jsdelivr.net/npm/asciinema-player@3.17.0/dist/bundle/asciinema-player.css",
+]
+extra_javascript = [
+  "https://cdn.jsdelivr.net/npm/asciinema-player@3.17.0/dist/bundle/asciinema-player.min.js",
+  "assets/asciinema-demo.js",
+]
 nav = [
   { "首页" = "index.md" },
   { "快速开始" = "getting-started.md" },
@@ -27,6 +34,7 @@ nav = [
 [project.theme]
 language = "zh"
 logo = "assets/aktion.svg"
+favicon = "assets/aktion.svg"
 features = [
   "navigation.instant",
   "navigation.instant.progress",

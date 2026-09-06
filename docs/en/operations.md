@@ -72,7 +72,7 @@ This checks the GitHub Actions service directly for each enabled repository. A h
 
 If a listener exited without removing its remote scale set, the next startup can fail with `RunnerScaleSetExistsException`. Use cleanup rather than trying to edit generated state.
 
-## Clean up a stale scale set
+## Clean up a stale scale set { #cleanup-stale-scale-set }
 
 First make sure no important job is running:
 

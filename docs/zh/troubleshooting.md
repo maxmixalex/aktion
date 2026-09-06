@@ -74,7 +74,7 @@ aktion cleanup
 
 检测到正在运行的临时 runner 时，cleanup 默认会拒绝继续。只有确认可以中断这些作业时，才使用 `aktion cleanup --force`。
 
-## 工作流一直等待 runner
+## 工作流一直等待 runner { #workflow-waiting-for-runner }
 
 **现象：** GitHub Actions 作业长时间处于 queued 状态，或持续提示正在等待 runner。
 
@@ -126,7 +126,7 @@ aktion restart
 
 不要依赖对 `compose.generated.yaml` 的手工修改；Aktion 会重新生成该文件。
 
-## 无法通过代理访问 GitHub 或 registry
+## 无法通过代理访问 GitHub 或 registry { #proxy-connectivity }
 
 **现象：** 主机上的代理可以正常使用，但 listener 或 runner 报告 connection refused 或 timeout。
 

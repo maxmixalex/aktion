@@ -70,4 +70,4 @@ aktion config resolve <repo-id>
 aktion logs <repo-id>
 ```
 
-如果错误仍然显示正在访问 `localhost`，通常说明代理地址无法从容器访问。参阅[无法通过代理访问 GitHub 或 registry](../troubleshooting.md)。
+如果错误仍然显示正在访问 `localhost`，通常说明代理地址无法从容器访问。参阅[无法通过代理访问 GitHub 或 registry](../troubleshooting.md#proxy-connectivity)。

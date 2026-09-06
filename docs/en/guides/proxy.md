@@ -70,4 +70,4 @@ aktion config resolve <repo-id>
 aktion logs <repo-id>
 ```
 
-If an error still attempts to reach `localhost`, the proxy address is usually not reachable from containers. See [Cannot reach GitHub or a registry through the proxy](../troubleshooting.md#cannot-reach-github-or-a-registry-through-the-proxy).
+If an error still attempts to reach `localhost`, the proxy address is usually not reachable from containers. See [Cannot reach GitHub or a registry through the proxy](../troubleshooting.md#proxy-connectivity).
