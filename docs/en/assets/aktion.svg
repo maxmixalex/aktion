@@ -1,21 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">Aktion</title>
-  <desc id="desc">A geometric A formed by two runner rails and a forward action mark.</desc>
-  <defs>
-    <linearGradient id="g" x1="20" y1="18" x2="108" y2="112" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#5B8CFF"/>
-      <stop offset="0.52" stop-color="#6C63FF"/>
-      <stop offset="1" stop-color="#A855F7"/>
-    </linearGradient>
-    <linearGradient id="h" x1="43" y1="82" x2="95" y2="50" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7DD3FC"/>
-      <stop offset="1" stop-color="#C4B5FD"/>
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="112" height="112" rx="29" fill="#0B1020"/>
-  <path d="M31 95 57.2 30.8A7.4 7.4 0 0 1 64 26.2a7.4 7.4 0 0 1 6.8 4.6L97 95" fill="none" stroke="url(#g)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M43 78h34" fill="none" stroke="url(#h)" stroke-width="9" stroke-linecap="round"/>
-  <path d="M76 66 94 78 76 90" fill="none" stroke="#F8FAFC" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="31" cy="95" r="6" fill="#7DD3FC"/>
-  <circle cx="97" cy="95" r="6" fill="#C084FC"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" width="1254" height="1254" role="img" aria-labelledby="title desc">
+  <title id="title">Aktion logo</title>
+  <desc id="desc">Aktion A mark with enlarged transparent separation and a slightly longer horizontal arrow.</desc>
+  <path d="M 905,250 L 770,250 L 180,1015 L 330,1015 L 540,772 L 1012,772 L 962,822 L 1058,822 L 1148,714 L 1060,604 L 958,604 L 1010,660 L 574,660 L 776,418 L 776,606 L 905,606 Z" fill="#000"/>
+  <path d="M 776,826 L 905,826 L 905,1015 L 776,1015 Z" fill="#000"/>
 </svg>

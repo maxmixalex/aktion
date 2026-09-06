@@ -74,7 +74,7 @@ aktion cleanup
 
 Cleanup refuses to run while ephemeral runners are active unless forced. Use `aktion cleanup --force` only when interrupting those jobs is acceptable.
 
-## Workflow keeps waiting for a runner
+## Workflow keeps waiting for a runner { #workflow-waiting-for-runner }
 
 **Symptom:** a GitHub Actions job remains queued or says it is waiting for a runner.
 
@@ -126,7 +126,7 @@ The first command verifies the new effective configuration; the second recreates
 
 Do not rely on manual edits to `compose.generated.yaml`; Aktion regenerates it.
 
-## Cannot reach GitHub or a registry through the proxy
+## Cannot reach GitHub or a registry through the proxy { #proxy-connectivity }
 
 **Symptom:** a host-side proxy works locally, but listeners or runners report connection refused or timeouts.
 

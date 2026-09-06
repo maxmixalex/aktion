@@ -137,7 +137,7 @@ Trigger the workflow manually, then run:
 aktion status
 ```
 
-You should briefly see an ephemeral runner and an active job. After the job finishes, the runner container is removed. If the job remains queued waiting for a runner, see [Workflow keeps waiting for a runner](troubleshooting.md#workflow-keeps-waiting-for-a-runner).
+You should briefly see an ephemeral runner and an active job. After the job finishes, the runner container is removed. If the job remains queued waiting for a runner, see [Workflow keeps waiting for a runner](troubleshooting.md#workflow-waiting-for-runner).
 
 ## Next steps
 

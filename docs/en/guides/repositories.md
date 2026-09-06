@@ -81,4 +81,4 @@ Set:
 
 and run `aktion restart`. Disabled entries do not participate in configuration resolution or listener startup. At least one repository must remain enabled or Aktion will reject the configuration.
 
-If you are trying to recover from a GitHub-side scale set left behind by a crashed listener, use [Clean up a stale scale set](../operations.md#clean-up-a-stale-scale-set) instead of editing generated Compose files.
+If you are trying to recover from a GitHub-side scale set left behind by a crashed listener, use [Clean up a stale scale set](../operations.md#cleanup-stale-scale-set) instead of editing generated Compose files.

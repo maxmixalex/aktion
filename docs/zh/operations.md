@@ -72,7 +72,7 @@ aktion scalesets
 
 如果 listener 退出时未能删除远端 scale set，下次启动可能出现 `RunnerScaleSetExistsException`。此时应执行 cleanup，而不是修改生成的状态文件。
 
-## 清理遗留的 scale set
+## 清理遗留的 scale set { #cleanup-stale-scale-set }
 
 先确认没有需要继续执行的作业：
 

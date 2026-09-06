@@ -81,4 +81,4 @@ runs-on: build-host
 
 然后运行 `aktion restart`。停用的仓库不会参与配置解析，也不会启动 listener。配置中必须至少有一个 `enabled: true` 的仓库，否则 Aktion 会拒绝加载配置。
 
-如果 GitHub 端残留了 listener 异常退出后留下的 scale set，请使用[清理遗留的 scale set](../operations.md)，不要修改生成的 Compose 文件。
+如果 GitHub 端残留了 listener 异常退出后留下的 scale set，请使用[清理遗留的 scale set](../operations.md#cleanup-stale-scale-set)，不要修改生成的 Compose 文件。

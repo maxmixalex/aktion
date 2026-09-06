@@ -137,7 +137,7 @@ jobs:
 aktion status
 ```
 
-作业开始后，应能短暂看到一个临时 runner 和一个正在运行的作业。作业结束后，该 runner 容器会被删除。如果作业持续等待 runner，请参阅[工作流一直等待 runner](troubleshooting.md)。
+作业开始后，应能短暂看到一个临时 runner 和一个正在运行的作业。作业结束后，该 runner 容器会被删除。如果作业持续等待 runner，请参阅[工作流一直等待 runner](troubleshooting.md#workflow-waiting-for-runner)。
 
 ## 后续配置
 
