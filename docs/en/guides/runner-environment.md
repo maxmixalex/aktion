@@ -1,6 +1,6 @@
 # Customize the runner environment
 
-Aktion treats the runner environment as host-administered configuration rather than something a repository can redefine through its workflow. You can combine Aktion builtins, public OCI Dev Container Features, and host-only OCI runner presets. Dependencies specific to one project are usually better installed by that project's workflow.
+Aktion treats the runner environment as host-administered configuration rather than something a repository can redefine through its workflow. You can combine Aktion builtins, public [Dev Container Features](https://containers.dev/features), and host-only runner presets distributed through [OCI](https://opencontainers.org/about/overview/) registries. Dependencies specific to one project are usually better installed by that project's workflow.
 
 ## Default environment
 
@@ -20,7 +20,7 @@ Aktion then adds these default Features:
 | `ghcr.io/devcontainers/features/python:1` | Use the Python already present in the base image; do not install tools |
 | `ghcr.io/devcontainers/features/git-lfs:1` | Git LFS with automatic pull disabled |
 
-The result is useful for common source checkouts, scripts, and C/C++ builds, but it is **not** the complete software inventory of a GitHub-hosted Ubuntu VM.
+The result is useful for common source checkouts, scripts, and C/C++ builds, but it is **not** the complete software inventory of a [GitHub-hosted runner](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners).
 
 Run:
 

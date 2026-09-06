@@ -1,7 +1,9 @@
 [project]
 site_name = "Aktion"
-site_description = "无需 Kubernetes 的自托管 GitHub Actions runner"
+site_description = "Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts."
 site_url = "https://zyf722.github.io/aktion/"
+repo_url = "https://github.com/zyf722/aktion"
+repo_name = "zyf722/aktion"
 docs_dir = "docs/zh"
 site_dir = "site"
 nav = [
@@ -24,6 +26,7 @@ nav = [
 
 [project.theme]
 language = "zh"
+logo = "assets/aktion.svg"
 features = [
   "navigation.instant",
   "navigation.instant.progress",
@@ -31,7 +34,33 @@ features = [
   "navigation.path",
   "navigation.top",
   "content.code.copy",
+  "content.tabs.link",
+  "content.tooltips",
 ]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "切换到浅色模式"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "indigo"
+accent = "deep purple"
+toggle.icon = "lucide/sun"
+toggle.name = "切换到深色模式"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "indigo"
+accent = "deep purple"
+toggle.icon = "lucide/moon-star"
+toggle.name = "跟随系统外观"
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
 
 [project.extra]
 alternate = [
@@ -41,8 +70,11 @@ alternate = [
 
 [project.markdown_extensions]
 admonition = {}
+attr_list = {}
 tables = {}
 pymdownx.details = {}
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
 pymdownx.highlight.anchor_linenums = true
 pymdownx.highlight.line_spans = "__span"
 pymdownx.highlight.pygments_lang_class = true

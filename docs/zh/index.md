@@ -1,6 +1,6 @@
 # Aktion
 
-**无需 Kubernetes 的自托管 GitHub Actions runner。**
+**Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.**
 
 Aktion 可让一台普通的 Docker 主机按需为多个 GitHub 仓库提供 runner。每个启用的仓库都有独立的 GitHub Runner Scale Set listener。GitHub 分配作业后，Aktion 会创建临时 Linux runner 容器，并在作业结束后将其删除。这样既保留 GitHub Actions 原有的工作流和排队机制，也无需仅为弹性 runner 部署 Kubernetes 或 Actions Runner Controller。
 

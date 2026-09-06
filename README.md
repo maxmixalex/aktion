@@ -1,6 +1,10 @@
-# Aktion
+<p align="center">
+  <img src="docs/en/assets/aktion.svg" alt="Aktion logo" width="112">
+</p>
 
-**Self-hosted GitHub Actions without Kubernetes.**
+<h1 align="center">Aktion</h1>
+
+<p align="center"><strong>Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.</strong></p>
 
 Aktion runs repository-scoped GitHub Runner Scale Set listeners on a normal Docker host and creates an ephemeral Linux runner container for each assigned job.
 

@@ -1,6 +1,6 @@
 # Aktion
 
-**Self-hosted GitHub Actions runners without Kubernetes.**
+**Aktion is a lightweight GitHub Actions runner scale-set manager for Docker hosts.**
 
 Aktion lets a normal Docker host serve multiple GitHub repositories with runners created on demand. Each enabled repository gets its own GitHub Runner Scale Set listener. When GitHub assigns a job, Aktion creates a temporary Linux runner container and removes it after the job finishes. You keep GitHub Actions' normal workflow and queueing model without deploying Kubernetes or Actions Runner Controller just to get elastic runners.
 
