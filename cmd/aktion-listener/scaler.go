@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/actions/scaleset"
 	"github.com/actions/scaleset/listener"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/google/uuid"
@@ -39,7 +41,7 @@ func (a *Scaler) HandleDesiredRunnerCount(ctx context.Context, count int) (int, 
 		a.logger.Info("Scaling up runners", slog.Int("currentCount", currentCount), slog.Int("desiredCount", targetRunnerCount), slog.Int("scaleUp", scaleUp))
 		for range scaleUp {
 			if _, err := a.startRunner(ctx); err != nil {
-				return 0, fmt.Errorf("failed to start runner: %w", err)
+				return a.runners.count(), fmt.Errorf("failed to start runner: %w", err)
 			}
 		}
 		return a.runners.count(), nil
@@ -74,10 +76,14 @@ func (a *Scaler) HandleJobCompleted(ctx context.Context, jobInfo *scaleset.JobCo
 		slog.Int64("workflowRunId", jobInfo.WorkflowRunID),
 		slog.String("result", jobInfo.Result),
 	)
-	containerID := a.runners.markDone(jobInfo.RunnerName)
-	if err := a.dockerClient.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
+	containerID := a.runners.containerID(jobInfo.RunnerName)
+	if containerID == "" {
+		return nil // Duplicate completion or an event from a previous listener session.
+	}
+	if err := a.dockerClient.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil && !cerrdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to remove runner container: %w", err)
 	}
+	a.runners.markDone(jobInfo.RunnerName)
 	return nil
 }
 
@@ -141,12 +147,25 @@ func (a *Scaler) startRunner(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create runner container: %w", err)
 	}
-	if err := a.dockerClient.ContainerStart(ctx, c.ID, container.StartOptions{}); err != nil {
+	if err := a.startRunnerContainer(ctx, c.ID); err != nil {
 		return "", fmt.Errorf("failed to start runner: %w", err)
 	}
 	a.runners.addIdle(name, c.ID)
 	a.logger.Info("Runner provisioned", slog.String("runnerName", name), slog.String("repository", os.Getenv("AKTION_REPOSITORY")))
 	return name, nil
+}
+
+func (a *Scaler) startRunnerContainer(ctx context.Context, id string) error {
+	if err := a.dockerClient.ContainerStart(ctx, id, container.StartOptions{}); err != nil {
+		// The request may have been canceled after creation; cleanup needs its own deadline.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if cleanupErr := a.dockerClient.ContainerRemove(cleanupCtx, id, container.RemoveOptions{Force: true}); cleanupErr != nil && !cerrdefs.IsNotFound(cleanupErr) {
+			return fmt.Errorf("%w (container %s cleanup failed: %v)", err, id, cleanupErr)
+		}
+		return err
+	}
+	return nil
 }
 
 func (a *Scaler) shutdown(ctx context.Context) {
@@ -188,7 +207,7 @@ func (r *runnerState) markBusy(name string) {
 	defer r.mu.Unlock()
 	state, ok := r.idle[name]
 	if !ok {
-		panic("marking non-existent runner busy")
+		return // Already busy, completed, or owned by a previous session.
 	}
 	delete(r.idle, name)
 	r.busy[name] = state
@@ -209,7 +228,16 @@ func (r *runnerState) markDoneUnlocked(name string) string {
 		delete(r.idle, name)
 		return containerID
 	}
-	panic("marking non-existent runner done")
+	return ""
+}
+
+func (r *runnerState) containerID(name string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if id := r.busy[name]; id != "" {
+		return id
+	}
+	return r.idle[name]
 }
 
 func (r *runnerState) addIdle(name, containerID string) {

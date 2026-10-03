@@ -1,6 +1,8 @@
-.git
-.github
-config.json
-compose.generated.yaml
-secrets
-*.md
+# Only listener runtime inputs belong in the build context.
+**
+!Dockerfile
+!dist/
+!dist/aktion-listener-linux-amd64
+!dist/aktion-listener-linux-arm64
+!packaging/
+!packaging/start-listener.sh

@@ -16,6 +16,7 @@ type fakeRunnerImageClient struct {
 	inspectErr error
 	pullErr    error
 	pullCalls  int
+	pullBody   string
 }
 
 func (f *fakeRunnerImageClient) ImageInspectWithRaw(context.Context, string) (image.InspectResponse, []byte, error) {
@@ -27,7 +28,30 @@ func (f *fakeRunnerImageClient) ImagePull(context.Context, string, image.PullOpt
 	if f.pullErr != nil {
 		return nil, f.pullErr
 	}
-	return io.NopCloser(bytes.NewBufferString("{}")), nil
+	if f.pullBody == "" {
+		return io.NopCloser(bytes.NewBufferString("{}")), nil
+	}
+	return io.NopCloser(bytes.NewBufferString(f.pullBody)), nil
+}
+
+func TestEnsureRunnerImageChecksPullStream(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		wantError  bool
+	}{
+		{"progress", "{\"status\":\"pulling\"}\n{\"status\":\"done\"}\n", false},
+		{"daemon error", "{\"status\":\"pulling\"}\n{\"error\":\"no space left on device\"}\n", true},
+		{"error detail", `{"errorDetail":{"message":"access denied"}}`, true},
+		{"truncated stream", `{"status":`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &fakeRunnerImageClient{inspectErr: cerrdefs.ErrNotFound, pullBody: tc.body}
+			err := ensureRunnerImage(context.Background(), client, "example/runner:test", discardLogger())
+			if (err != nil) != tc.wantError {
+				t.Fatalf("error = %v, want error %v", err, tc.wantError)
+			}
+		})
+	}
 }
 
 func discardLogger() *slog.Logger {

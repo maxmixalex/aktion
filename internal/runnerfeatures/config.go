@@ -94,12 +94,12 @@ func DefaultSelections() Selections {
 		"builtin:build": {},
 		"builtin:clang": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
-			"installZsh":               false,
+			"installZsh":                 false,
 			"configureZshAsDefaultShell": false,
-			"installOhMyZsh":           false,
-			"installOhMyZshConfig":     false,
-			"upgradePackages":          false,
-			"username":                 "none",
+			"installOhMyZsh":             false,
+			"installOhMyZshConfig":       false,
+			"upgradePackages":            false,
+			"username":                   "none",
 		},
 		"ghcr.io/devcontainers/features/python:1": {
 			"version":      "os-provided",
@@ -142,12 +142,12 @@ func NormalizeSelections(in Selections) (Selections, error) {
 }
 
 func NormalizeReference(ref string) (string, error) {
-	ref = strings.ToLower(strings.TrimSpace(ref))
+	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return "", fmt.Errorf("feature reference cannot be empty")
 	}
-	if strings.HasPrefix(ref, "builtin:") {
-		id := strings.TrimPrefix(ref, "builtin:")
+	if strings.HasPrefix(strings.ToLower(ref), "builtin:") {
+		id := strings.TrimPrefix(strings.ToLower(ref), "builtin:")
 		if id == "" || strings.ContainsAny(id, "/:@") {
 			return "", fmt.Errorf("invalid builtin feature reference %q", ref)
 		}

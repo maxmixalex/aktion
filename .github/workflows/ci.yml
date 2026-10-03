@@ -43,6 +43,9 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test listener startup
+        run: sh ./packaging/start-listener_test.sh
+
       - name: Vet
         run: go vet ./...
 

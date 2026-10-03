@@ -22,7 +22,7 @@ const ManifestAccept = "application/vnd.oci.image.manifest.v1+json, application/
 
 var (
 	pathPattern   = regexp.MustCompile("^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$")
-	tagPattern    = regexp.MustCompile("^[a-z0-9_][a-z0-9._-]{0,127}$")
+	tagPattern    = regexp.MustCompile("^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$")
 	bearerParamRE = regexp.MustCompile("([a-zA-Z][a-zA-Z0-9_-]*)=\\\"([^\\\"]*)\\\"")
 )
 
@@ -34,7 +34,7 @@ type Reference struct {
 }
 
 func ParseReference(input string) (Reference, error) {
-	input = strings.ToLower(strings.TrimSpace(input))
+	input = strings.TrimSpace(input)
 	if input == "" || strings.Contains(input, "://") {
 		return Reference{}, fmt.Errorf("invalid OCI reference %q", input)
 	}
@@ -64,6 +64,7 @@ func ParseReference(input string) (Reference, error) {
 			return Reference{}, fmt.Errorf("invalid OCI tag %q", reference)
 		}
 	}
+	resource = strings.ToLower(resource)
 	slash := strings.Index(resource, "/")
 	if slash <= 0 || slash == len(resource)-1 {
 		return Reference{}, fmt.Errorf("OCI reference must look like registry/namespace/name[:tag]: %q", input)
@@ -180,6 +181,9 @@ func (c *Client) FetchManifest(ctx context.Context, input, accept string) (Artif
 
 func (c *Client) FetchBlob(ctx context.Context, ref Reference, digest string) ([]byte, error) {
 	if !strings.HasPrefix(digest, "sha256:") || len(strings.TrimPrefix(digest, "sha256:")) != 64 {
+		return nil, fmt.Errorf("invalid OCI blob digest %q", digest)
+	}
+	if _, err := hex.DecodeString(strings.TrimPrefix(digest, "sha256:")); err != nil {
 		return nil, fmt.Errorf("invalid OCI blob digest %q", digest)
 	}
 	cachePath := filepath.Join(c.CacheDir, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:"))

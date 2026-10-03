@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,8 +30,25 @@ func ensureRunnerImage(ctx context.Context, client runnerImageClient, imageName 
 		return fmt.Errorf("failed to pull runner image %q: %w", imageName, err)
 	}
 	defer pull.Close()
-	if _, err := io.Copy(io.Discard, pull); err != nil {
-		return fmt.Errorf("failed to read runner image pull response for %q: %w", imageName, err)
+	decoder := json.NewDecoder(pull)
+	for {
+		var progress struct {
+			Error       string `json:"error"`
+			ErrorDetail struct {
+				Message string `json:"message"`
+			} `json:"errorDetail"`
+		}
+		if err := decoder.Decode(&progress); err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("failed to read runner image pull response for %q: %w", imageName, err)
+		}
+		if progress.ErrorDetail.Message != "" {
+			progress.Error = progress.ErrorDetail.Message
+		}
+		if progress.Error != "" {
+			return fmt.Errorf("failed to pull runner image %q: %s", imageName, progress.Error)
+		}
 	}
 	return nil
 }
