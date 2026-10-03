@@ -12,7 +12,7 @@ With no command, Aktion runs `status`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--root DIR` | Current working directory | Configuration root. Relative private-key paths and generated Compose state use this root. |
+| `--root DIR` | Executable directory | Configuration root (symbolic links are resolved). Explicit relative paths, including `--root .`, are resolved from the working directory. Relative private-key paths and generated Compose state use this root. |
 | `--config FILE` | `config.json` | Configuration filename. |
 | `--color auto\|always\|never` | `auto` | ANSI color output. |
 | `--links auto\|always\|never` | `auto` | OSC 8 terminal hyperlinks. |

@@ -71,7 +71,7 @@ Aktion 仅支持 [GitHub App](https://docs.github.com/en/apps/creating-github-ap
 }
 ```
 
-将 PEM 保存到 `./secrets/github-app.pem`。相对路径以 Aktion 的配置根目录为基准；默认配置根目录是当前工作目录。
+将 PEM 保存到 `./secrets/github-app.pem`。相对路径以 Aktion 的配置根目录为基准；默认配置根目录是 Aktion 可执行文件所在目录（符号链接使用其目标文件所在目录）。将该目录加入 `PATH` 后，可以从任意工作目录运行 Aktion。使用 `--root DIR` 指定其他配置目录，或使用 `--root .` 显式选择当前工作目录。
 
 `minRunners: 0` 表示没有作业时该仓库可以缩容到零个 runner。`maxRunners: 1` 表示该仓库同时最多运行一个 runner。此上限按仓库计算，不是整台主机的总上限。
 

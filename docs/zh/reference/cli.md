@@ -12,7 +12,7 @@ aktion [--root DIR] [--config FILE] [--color MODE] [--links MODE] <command> [arg
 
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `--root DIR` | 当前工作目录 | 配置根目录。相对私钥路径和生成的 Compose 文件均以此目录为基准。 |
+| `--root DIR` | 可执行文件所在目录 | 配置根目录（符号链接解析到目标文件）。显式指定的相对路径以工作目录为基准，`--root .` 使用当前工作目录。相对私钥路径和生成的 Compose 文件均以此目录为基准。 |
 | `--config FILE` | `config.json` | 配置文件名。 |
 | `--color auto\|always\|never` | `auto` | ANSI 颜色输出模式。 |
 | `--links auto\|always\|never` | `auto` | OSC 8 终端链接输出模式。 |

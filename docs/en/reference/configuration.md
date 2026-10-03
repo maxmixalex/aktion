@@ -1,6 +1,6 @@
 # Configuration reference
 
-Aktion reads `config.json` from the configuration root by default. Use `--root DIR` to change the root and `--config FILE` to change the filename. Unknown JSON fields are rejected, so a misspelled key is not silently ignored.
+Aktion reads `config.json` from the configuration root by default. The root defaults to the executable directory (resolving symbolic links), regardless of the working directory. Use `--root DIR` to change the root and `--config FILE` to change the filename. Unknown JSON fields are rejected, so a misspelled key is not silently ignored.
 
 ## Complete shape
 

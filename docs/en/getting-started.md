@@ -71,7 +71,7 @@ Create `config.json`:
 }
 ```
 
-Place the PEM at `./secrets/github-app.pem`. Relative paths are resolved from Aktion's configuration root, which defaults to the current working directory.
+Place the PEM at `./secrets/github-app.pem`. Relative paths are resolved from Aktion's configuration root, which defaults to the directory containing the Aktion executable (after resolving symbolic links). You can add that directory to `PATH` and run Aktion from any working directory. Use `--root DIR` for a different installation, or `--root .` to use the current working directory.
 
 `minRunners: 0` lets the repository scale to zero when there are no jobs. `maxRunners: 1` allows one runner for this repository at a time. The limit is **per repository**, not a host-wide cap.
 

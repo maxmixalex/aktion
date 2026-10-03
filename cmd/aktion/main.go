@@ -160,10 +160,9 @@ func main() {
 }
 
 func run(args []string) int {
-	rootDefault, _ := os.Getwd()
 	fs := flag.NewFlagSet("aktion", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	root := fs.String("root", rootDefault, "configuration directory")
+	root := fs.String("root", "", "configuration directory (default: executable directory)")
 	configName := fs.String("config", "config.json", "configuration file name")
 	colorMode := fs.String("color", "auto", "color output: auto, always, never")
 	linkMode := fs.String("links", "auto", "terminal hyperlinks: auto, always, never")
@@ -184,11 +183,6 @@ func run(args []string) int {
 		cmd = strings.ToLower(rest[0])
 		rest = rest[1:]
 	}
-	absRoot, err := filepath.Abs(*root)
-	if err != nil {
-		return fail(err)
-	}
-
 	switch cmd {
 	case "help", "-h", "--help":
 		printUsage()
@@ -200,6 +194,10 @@ func run(args []string) int {
 		return cmdFeatures()
 	}
 
+	absRoot, err := resolveConfigRoot(*root)
+	if err != nil {
+		return fail(err)
+	}
 	loaded, err := loadConfig(absRoot, *configName)
 	if err != nil {
 		return fail(err)
@@ -334,7 +332,12 @@ func printUsage() {
 	fmt.Println(`aktion - local manager for GitHub Actions Docker runner scale sets
 
 Usage:
-  aktion [--root DIR] [--color auto|always|never] [--links auto|always|never] <command> [args]
+  aktion [--root DIR] [--config FILE] [--color auto|always|never] [--links auto|always|never] <command> [args]
+
+Configuration:
+  Defaults to config.json beside the executable (resolving symbolic links).
+  --root DIR       Override the configuration root; --root . uses the working directory.
+  --config FILE    Override the configuration filename.
 
 Commands:
   features          List Aktion builtins and default OCI Features
