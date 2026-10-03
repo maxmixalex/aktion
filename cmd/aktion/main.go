@@ -266,13 +266,11 @@ func run(args []string) int {
 		if err := ensureDocker(); err != nil {
 			return fail(err)
 		}
-		if code := runStreaming(loaded.Root, "docker", "compose", "-f", p, "down"); code != 0 {
-			return code
-		}
-		if err := ensureRunnerFeatureImages(loaded); err != nil {
-			return fail(err)
-		}
-		return runStreaming(loaded.Root, "docker", "compose", "-f", p, "up", "-d", "--build")
+		return restartStack(func() error {
+			return ensureRunnerFeatureImages(loaded)
+		}, func(args ...string) int {
+			return runStreaming(loaded.Root, "docker", append([]string{"compose", "-f", p}, args...)...)
+		})
 	case "cleanup":
 		return cmdCleanup(loaded, rest)
 	case "scalesets":

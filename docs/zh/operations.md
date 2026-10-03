@@ -14,7 +14,7 @@ aktion restart
 
 `down` 会停止并删除 listener，不会删除 `config.json`、私钥或已经构建的 Docker image。
 
-`restart` 会重新生成配置，停止当前 listener，准备 runner image，再重新启动。修改仓库、容量、Feature、代理或其他运行配置后，应执行该命令。
+`restart` 会重新生成配置，先构建 runner 和 listener 镜像；任一构建失败时保留现有 listener 运行。全部构建成功后，才停止当前 listener 并使用已构建镜像重新启动。修改仓库、容量、Feature、代理或其他运行配置后，应执行该命令。
 
 ## 查看整体状态
 

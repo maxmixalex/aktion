@@ -51,7 +51,7 @@ aktion down
 aktion restart
 ```
 
-重新生成配置，停止 listener，准备 runner image，再重新启动 listener。修改运行配置后使用该命令。
+重新生成配置，先构建 runner 和 listener 镜像，再停止并重新启动 listener。构建失败时不会停止现有 listener。修改运行配置后使用该命令。
 
 ### `doctor`
 

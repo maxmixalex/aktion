@@ -1,10 +1,12 @@
 package runnerfeatures
 
 import (
+	"bytes"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"sort"
 	"strings"
@@ -139,7 +141,7 @@ func Catalog() (map[string]BuiltinFeature, error) {
 	sort.Strings(ids)
 	for _, id := range ids {
 		definition := builtinDefinitions[id]
-		install, err := builtinFiles.ReadFile("features/" + id + "/install.sh")
+		install, err := readBuiltinInstall(builtinFiles, id)
 		if err != nil {
 			return nil, err
 		}
@@ -164,6 +166,15 @@ func Catalog() (map[string]BuiltinFeature, error) {
 		}
 	}
 	return out, nil
+}
+
+func readBuiltinInstall(files fs.FS, id string) ([]byte, error) {
+	install, err := fs.ReadFile(files, "features/"+id+"/install.sh")
+	if err != nil {
+		return nil, err
+	}
+	// go:embed preserves checkout bytes, including Windows CRLF shebangs.
+	return bytes.ReplaceAll(install, []byte("\r\n"), []byte("\n")), nil
 }
 
 func loadBuiltin(ref string) (FeaturePackage, error) {

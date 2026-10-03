@@ -51,7 +51,7 @@ Stops and removes the listener stack without deleting configuration, the private
 aktion restart
 ```
 
-Regenerates configuration, stops listeners, prepares runner images, and starts listeners again. Use after runtime configuration changes.
+Regenerates configuration and builds runner and listener images before stopping listeners, then starts listeners using the built images. Build failures leave existing listeners running. Use after runtime configuration changes.
 
 ### `doctor`
 

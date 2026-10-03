@@ -14,7 +14,7 @@ aktion restart
 
 `down` stops and removes the listener stack. It does not delete `config.json`, the private key, or built Docker images.
 
-`restart` regenerates configuration, stops the current listener stack, prepares runner images, and starts it again. Use it after changing repositories, capacity, Features, proxy settings, or other runtime configuration.
+`restart` regenerates configuration and builds runner and listener images before stopping the current listener stack. If either build fails, existing listeners remain running. After successful builds, it recreates listeners using those images. Use it after changing repositories, capacity, Features, proxy settings, or other runtime configuration.
 
 ## Check overall status
 
